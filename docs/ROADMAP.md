@@ -40,8 +40,12 @@
 - Running transport total. The trip is saved in the browser.
 - Launch cities: 6 US departure cities; Beijing, Shanghai, Guangzhou, Shenzhen, Chengdu, Chongqing, Xi'an, Hangzhou, Guilin, Hong Kong; Tokyo, Seoul, Bangkok, Singapore; London, Paris, Rome, Barcelona, Amsterdam, Istanbul.
 
+### Phase 1 review feedback (to build next)
+- Add a small airplane marker riding each dotted flight line, so flights are distinct from train routes at a glance.
+- A separate swipe/slide-to screen per city: the local city map with recommended hotels and attractions pinned. Plan: a free map (OpenFreeMap street map) with pins, plus "open in Google Maps" links. Inside mainland China, Google Maps is blocked and its streets are offset, so also offer Amap/Apple Maps links there.
+
 ### Phase 2: destination guides and maps
-- Street-level city maps when zoomed in (OpenFreeMap).
+- Street-level city maps when zoomed in (OpenFreeMap), on the city slide screen described above.
 - Stay / See / Do / Eat tabs per city with map pins, ratings where licensed, price level and credited sources.
 - Live transit routing between and within cities where open data covers it.
 
