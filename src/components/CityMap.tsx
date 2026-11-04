@@ -68,6 +68,9 @@ export default function CityMap({ city, places, activeId, hoverId, onSelect }: P
       });
       mapRef.current = map;
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+      // The map can be hidden and shown (phone list/map toggle), so keep it sized to its box.
+      const ro = new ResizeObserver(() => map.resize());
+      ro.observe(container.current);
       map.on("load", () => { loaded = true; setReady(true); });
       map.on("error", () => {
         if (loaded) return; // a single missing tile later on is fine
@@ -82,6 +85,7 @@ export default function CityMap({ city, places, activeId, hoverId, onSelect }: P
       window.addEventListener("in:themechange", onTheme);
       mq.addEventListener("change", onTheme);
       cleanup = () => {
+        ro.disconnect();
         window.removeEventListener("in:themechange", onTheme);
         mq.removeEventListener("change", onTheme);
         markers.current.forEach((m) => m.remove());

@@ -54,7 +54,21 @@
 - Stay / See / Do / Eat tabs per city with map pins, ratings where licensed, price level and credited sources.
 - Live transit routing between and within cities where open data covers it.
 
-### Phase 3: AI planner and "Before you go"
+### Phase 2 review feedback ✅ built
+- City screen redesigned for a calmer, more luxurious feel (patterns from editorial guides and booking sites): photo hero, six large tabs, friendly subcategories ("Temples & sacred sites", "Boutique & heritage"…), three "Our picks" (one per price level for stays), a short list with "Show more", and a separate detail page with photo, key facts and one main action.
+- Save places with a heart; the Saved tab collects them per city and the concierge plans around them.
+- Phones: list and map are separate screens with a floating Map / List button.
+- Photos: the city's Wikivoyage banner and listing photos from Wikimedia and Wikipedia (free).
+
+### Phase 3: AI planner and "Before you go" ✅ ready for review
+- Concierge screen (top bar, or "Plan my days" in the itinerary): describe the trip, tap interests, pace and comfort, then "Write my itinerary".
+- Gemini writes a day-by-day plan matched to the route's exact dates and cities, using real places from the guides and your saved places. Vague requests also get 3–4 follow-up questions as tap-to-answer chips; "Update my itinerary" refines it.
+- With no stops yet, it suggests a route with nights, applied in one tap.
+- Before you go: visa & entry (flagged), money, phone & internet, getting around, health, etiquette, weather & packing, plus fixed links to the US State Department and each country's official entry pages.
+- Every AI reply is checked against a strict format (wrong dates and unknown cities are dropped) and retried once if malformed. Without a key, a clearly labelled sample plan is shown.
+- The plan is saved with the trip and flagged when the route changes.
+
+### Phase 3 (original notes)
 - Chat-style trip request that produces a full day-by-day itinerary, with follow-up questions for vague requests.
 - Drag places into days; auto-fill empty days.
 - Before-you-go panel: visas (e.g. China's visa-free transit rules and the Hong Kong border), advisories, season, money, plugs, apps that work in China.

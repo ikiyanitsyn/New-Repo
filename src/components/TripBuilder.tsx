@@ -8,7 +8,7 @@ import { fmtRange, fmtShort } from "@/lib/format";
 import { stopsWithDates, tripEndDate, tripNights, type FlightPick, type Leg, type Trip } from "@/lib/trip";
 import type { TripAction } from "@/lib/tripReducer";
 import { CityPicker } from "./CityPicker";
-import { ArrowIcon, CloseIcon, DownIcon, MinusIcon, MODE_ICON, MODE_LABEL, PlaneIcon, PlusIcon, UpIcon } from "./icons";
+import { ArrowIcon, SparkIcon, CloseIcon, DownIcon, MinusIcon, MODE_ICON, MODE_LABEL, PlaneIcon, PlusIcon, UpIcon } from "./icons";
 
 interface Props {
   trip: Trip;
@@ -17,9 +17,10 @@ interface Props {
   selectedLegId: string | null;
   onSelectLeg: (id: string) => void;
   onExplore: (stopId: string) => void;
+  onConcierge: () => void;
 }
 
-export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, onExplore }: Props) {
+export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, onExplore, onConcierge }: Props) {
   const [adding, setAdding] = useState(false);
   const [morePax, setMorePax] = useState(trip.adults > 2);
   const stops = stopsWithDates(trip);
@@ -48,6 +49,9 @@ export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, 
             "Add the city you fly into to begin."
           )}
         </p>
+        <button type="button" onClick={onConcierge} className="btn mt-1 self-start !h-9 !text-[13.5px]" style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>
+          <SparkIcon size={15} /> {trip.plan ? "View day-by-day plan" : "Plan my days with the concierge"}
+        </button>
       </header>
 
       <div className="scroll-y flex min-h-0 flex-1 flex-col gap-5 px-5 py-4">

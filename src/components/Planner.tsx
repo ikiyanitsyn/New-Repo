@@ -7,6 +7,8 @@ import { getCity } from "@/lib/cities";
 import { isTrip, sampleTrip, stopsWithDates, tripLegs, type Trip } from "@/lib/trip";
 import { tripReducer } from "@/lib/tripReducer";
 import { CityExplorer } from "./CityExplorer";
+import { Concierge } from "./Concierge";
+import { SparkIcon } from "./icons";
 import { LegPanel } from "./LegPanel";
 import { ThemeToggle } from "./ThemeToggle";
 import { TripBuilder } from "./TripBuilder";
@@ -67,7 +69,13 @@ export function Planner() {
   const hash = useSyncExternalStore(subscribeHash, readHash, () => "");
   const hashStop = hash.startsWith("#explore-") ? hash.slice("#explore-".length) : null;
   const exploreStopId = datedStops.some((s) => s.id === hashStop) ? hashStop : null;
+  const conciergeOpen = hash === "#concierge";
   const openExplorer = (stopId: string) => { window.location.hash = `explore-${stopId}`; };
+  const openConcierge = () => { window.location.hash = "concierge"; };
+  const openCityFromPlan = (cityCode: string) => {
+    const stop = datedStops.find((s) => s.city === cityCode);
+    if (stop) replaceHash(`#explore-${stop.id}`);
+  };
   const moveExplorer = (stopId: string) => replaceHash(`#explore-${stopId}`);
   const closeExplorer = () => replaceHash("");
 
@@ -78,7 +86,10 @@ export function Planner() {
           Intercontinental <em>Nomad</em>
         </Link>
         <nav className="flex items-center gap-1 text-[13.5px]" aria-label="Main">
-          <span className="btn btn-ghost !text-ink" aria-current="page">Plan</span>
+          <button type="button" className={`btn btn-ghost hidden sm:inline-flex ${!conciergeOpen ? "!text-ink" : ""}`} aria-current={!conciergeOpen ? "page" : undefined} onClick={() => replaceHash("")}>Route</button>
+          <button type="button" className={`btn btn-ghost ${conciergeOpen ? "!text-ink" : ""}`} aria-current={conciergeOpen ? "page" : undefined} onClick={openConcierge}>
+            <SparkIcon size={15} className="text-accent" /> Concierge
+          </button>
           <span className="btn btn-ghost hidden cursor-default opacity-60 sm:inline-flex" title="Coming with accounts">My trips</span>
           <span className="btn btn-ghost hidden cursor-default opacity-60 sm:inline-flex" title="Coming with accounts">Shared trips</span>
           <span className="mx-1 hidden h-5 w-px bg-[var(--line)] sm:block" />
@@ -92,7 +103,7 @@ export function Planner() {
       <main className="stage">
         <Globe home={home} stops={globeStops} legs={legs} selectedLegId={activeLegId} onSelectLeg={setSelectedLegId} onOpenStop={openExplorer} />
         <div className="stage-panels">
-          <TripBuilder trip={trip} dispatch={dispatch} legs={legs} selectedLegId={activeLegId} onSelectLeg={selectLeg} onExplore={openExplorer} />
+          <TripBuilder trip={trip} dispatch={dispatch} legs={legs} selectedLegId={activeLegId} onSelectLeg={selectLeg} onExplore={openExplorer} onConcierge={openConcierge} />
           <LegPanel
             leg={selectedLeg}
             trip={trip}
@@ -101,8 +112,17 @@ export function Planner() {
           />
         </div>
         {exploreStopId && (
-          <CityExplorer stops={datedStops} stopId={exploreStopId} adults={trip.adults} onNavigate={moveExplorer} onClose={closeExplorer} />
+          <CityExplorer
+            stops={datedStops}
+            stopId={exploreStopId}
+            adults={trip.adults}
+            saved={trip.saved?.[datedStops.find((s) => s.id === exploreStopId)!.city] ?? []}
+            onToggleSave={(place) => dispatch({ type: "toggleSave", city: datedStops.find((s) => s.id === exploreStopId)!.city, place })}
+            onNavigate={moveExplorer}
+            onClose={closeExplorer}
+          />
         )}
+        {conciergeOpen && <Concierge trip={trip} dispatch={dispatch} onClose={closeExplorer} onOpenCity={openCityFromPlan} />}
       </main>
     </div>
   );

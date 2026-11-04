@@ -1,6 +1,7 @@
 import type { Mode } from "./ground";
 import type { Cabin } from "./flights/types";
-import { newId, sampleTrip, type FlightPick, type Trip } from "./trip";
+import { newId, sampleTrip, type FlightPick, type SavedPlace, type Trip } from "./trip";
+import type { SavedPlan } from "./ai/schema";
 
 export type TripAction =
   | { type: "load"; trip: Trip }
@@ -16,7 +17,10 @@ export type TripAction =
   | { type: "moveStop"; id: string; dir: -1 | 1 }
   | { type: "nights"; id: string; value: number }
   | { type: "mode"; key: string; mode: Mode }
-  | { type: "pick"; legId: string; pick: FlightPick | null };
+  | { type: "pick"; legId: string; pick: FlightPick | null }
+  | { type: "toggleSave"; city: string; place: SavedPlace }
+  | { type: "plan"; plan: SavedPlan | null }
+  | { type: "replaceStops"; stops: { city: string; nights: number }[] };
 
 export function tripReducer(t: Trip, a: TripAction): Trip {
   switch (a.type) {
@@ -58,5 +62,20 @@ export function tripReducer(t: Trip, a: TripAction): Trip {
       else delete picks[a.legId];
       return { ...t, picks };
     }
+    case "toggleSave": {
+      const list = t.saved?.[a.city] ?? [];
+      const has = list.some((p) => p.key === a.place.key);
+      const next = has ? list.filter((p) => p.key !== a.place.key) : [...list, a.place];
+      return { ...t, saved: { ...(t.saved ?? {}), [a.city]: next } };
+    }
+    case "plan":
+      return a.plan ? { ...t, plan: a.plan } : { ...t, plan: undefined };
+    case "replaceStops":
+      return {
+        ...t,
+        stops: a.stops.map((s) => ({ id: newId(), city: s.city, nights: Math.max(1, Math.min(30, Math.round(s.nights))) })),
+        legModes: {},
+        picks: {},
+      };
   }
 }

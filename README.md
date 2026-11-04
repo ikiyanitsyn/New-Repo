@@ -2,7 +2,7 @@
 
 Plan multi-city trips on one screen: fly into one city and home from another, add stops and how you'll travel between them, and compare fares by cheapest, fastest or the best balance of both, all on an interactive globe.
 
-**Status:** Phase 1 of 5. See [docs/ROADMAP.md](docs/ROADMAP.md).
+**Status:** Phase 3 of 5. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Quick start
 
@@ -40,12 +40,14 @@ src/
     FlightResults.tsx     Best / Cheapest / Fastest, nonstop filter, slider
     CityExplorer.tsx      per-city screen: stays, sights, food, with list ⇄ map
     CityMap.tsx           OpenFreeMap street map with category pins
+    Concierge.tsx         AI trip concierge: request, chips, day-by-day plan, before you go
   lib/
     cities.ts             launch city list with airport codes
     trip.ts, tripReducer  trip model: legs, dates, edits
     ground.ts             rail schedules on file and bus/car/ferry estimates
     flights/              providers (Travelpayouts, SerpApi, sample), ranking, booking links
-    places/               Wikivoyage listing parser, city guide fetcher, map and hotel links
+    places/               Wikivoyage listing parser, subcategories and picks, photos, map and hotel links
+    ai/                   AI provider (Gemini), prompt, response schema and checks, official entry links
 docs/                     setup guide and roadmap
 ```
 

@@ -1,7 +1,8 @@
 import "server-only";
 import { getCity } from "../cities";
 import { distanceKm } from "../geo";
-import { districtLinks, parseListings, redirectTarget } from "./parse";
+import { districtLinks, pageBanner, parseListings, redirectTarget } from "./parse";
+import { commonsThumb } from "./links";
 import { CATEGORY_ORDER, type Place, type PlacesResult } from "./types";
 
 /**
@@ -34,6 +35,40 @@ async function raw(title: string, depth = 0): Promise<{ title: string; text: str
   const target = redirectTarget(text);
   if (target && depth < 2) return raw(target, depth + 1);
   return { title, text };
+}
+
+/**
+ * Photos for listings that name a Wikipedia article: one batched request to
+ * Wikipedia's page-images API (up to 50 titles per call).
+ */
+async function wikipediaThumbs(titles: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (let i = 0; i < titles.length; i += 50) {
+    const batch = titles.slice(i, i + 50);
+    const params = new URLSearchParams({
+      action: "query", prop: "pageimages", piprop: "thumbnail", pithumbsize: "640",
+      redirects: "1", format: "json", formatversion: "2", titles: batch.join("|"),
+    });
+    try {
+      const res = await fetch(`https://en.wikipedia.org/w/api.php?${params}`, { headers: HEADERS, signal: AbortSignal.timeout(10000) });
+      if (!res.ok) continue;
+      const j = (await res.json()) as {
+        query?: { pages?: { title: string; thumbnail?: { source: string } }[]; redirects?: { from: string; to: string }[]; normalized?: { from: string; to: string }[] };
+      };
+      const pages = new Map((j.query?.pages ?? []).filter((p) => p.thumbnail).map((p) => [p.title, p.thumbnail!.source]));
+      const alias = new Map<string, string>();
+      for (const r of [...(j.query?.normalized ?? []), ...(j.query?.redirects ?? [])]) alias.set(r.from, r.to);
+      for (const t of batch) {
+        let k = t;
+        for (let n = 0; n < 3 && alias.has(k); n++) k = alias.get(k)!;
+        const src = pages.get(k);
+        if (src) out.set(t, src);
+      }
+    } catch {
+      // Photos are a nice-to-have; carry on without them.
+    }
+  }
+  return out;
 }
 
 const MAX_PER_CATEGORY = 40;
@@ -83,7 +118,20 @@ export async function cityPlaces(cityCode: string): Promise<PlacesResult> {
       trimmed.push(...[...mapped, ...unmapped].slice(0, MAX_PER_CATEGORY));
     }
 
-    const value: PlacesResult = { ...base, articleTitle: main.title, articleUrl: articleUrl(main.title), places: trimmed };
+    const thumbs = await wikipediaThumbs([...new Set(trimmed.filter((p) => p.wikipedia && !p.image).map((p) => p.wikipedia!))]);
+    for (const p of trimmed) {
+      if (p.image) p.thumb = commonsThumb(p.image, 640);
+      else if (p.wikipedia && thumbs.has(p.wikipedia)) p.thumb = thumbs.get(p.wikipedia);
+    }
+    const banner = pageBanner(main.text);
+
+    const value: PlacesResult = {
+      ...base,
+      articleTitle: main.title,
+      articleUrl: articleUrl(main.title),
+      banner: banner ? commonsThumb(banner, 1600) : undefined,
+      places: trimmed,
+    };
     cache.set(cityCode, { at: Date.now(), value });
     return value;
   } catch (err) {

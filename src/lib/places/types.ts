@@ -28,6 +28,8 @@ export interface Place {
   phone?: string;
   url?: string;
   image?: string; // Wikimedia Commons file name
+  /** Ready-to-use photo URL (from the guide's image or the place's Wikipedia article). */
+  thumb?: string;
   wikipedia?: string;
   /** Price tier for stays and food, from the guide's Budget / Mid-range / Splurge headings. */
   tier?: "Budget" | "Mid-range" | "Splurge";
@@ -41,6 +43,8 @@ export interface PlacesResult {
   source: "wikivoyage";
   articleTitle: string;
   articleUrl: string;
+  /** Wide photo for the top of the city screen. */
+  banner?: string;
   places: Place[];
   fetchedAt: string;
   error?: string;

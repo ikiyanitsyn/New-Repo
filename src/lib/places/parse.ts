@@ -186,3 +186,9 @@ export function redirectTarget(wikitext: string): string | undefined {
   const m = /^#REDIRECT\s*\[\[([^\]|#]+)/i.exec(wikitext.trim());
   return m?.[1].trim();
 }
+
+/** The article's banner image, from {{pagebanner|File name.jpg|...}}. */
+export function pageBanner(wikitext: string): string | undefined {
+  const m = /\{\{\s*pagebanner\s*\|\s*([^|}\n]+\.(?:jpe?g|png|webp))/i.exec(wikitext);
+  return m?.[1].trim();
+}

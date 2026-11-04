@@ -77,3 +77,36 @@ describe("Wikivoyage listings", () => {
     expect(cleanText("[[A|B]] &amp; [[C]]&nbsp;x")).toBe("B & C x");
   });
 });
+
+import { pageBanner } from "../places/parse";
+import { picksFor, subcategoryOf } from "../places/subcategory";
+import type { Place } from "../places/types";
+
+describe("banner and subcategories", () => {
+  it("reads the page banner", () => {
+    expect(pageBanner("{{pagebanner|Beijing banner Forbidden City.jpg|caption=x}}\n")).toBe("Beijing banner Forbidden City.jpg");
+    expect(pageBanner("no banner")).toBeUndefined();
+  });
+
+  const p = (o: Partial<Place>): Place => ({ id: o.name ?? "x", category: "see", name: "x", ...o });
+
+  it("groups places into friendly subcategories", () => {
+    expect(subcategoryOf(p({ name: "Lama Temple" }))).toBe("Temples & sacred sites");
+    expect(subcategoryOf(p({ name: "National Museum of China" }))).toBe("Museums & galleries");
+    expect(subcategoryOf(p({ name: "Nanluoguxiang", description: "A busy hutong lane." }))).toBe("Neighbourhoods & streets");
+    expect(subcategoryOf(p({ category: "sleep", name: "Grand Hotel", tier: "Splurge" }))).toBe("Luxury");
+    expect(subcategoryOf(p({ category: "eat", name: "Da Dong", description: "Famous for Peking duck." }))).toBe("Local specialties");
+    expect(subcategoryOf(p({ category: "eat", name: "Somewhere" }))).toBe("Restaurants");
+  });
+
+  it("picks one stay per price level when it can", () => {
+    const stays = [
+      p({ category: "sleep", name: "A", tier: "Budget" }),
+      p({ category: "sleep", name: "B", tier: "Splurge", thumb: "x" }),
+      p({ category: "sleep", name: "C", tier: "Mid-range" }),
+    ];
+    expect(picksFor(stays, "sleep").map((x) => [x.place.name, x.label])).toEqual([
+      ["B", "Splurge stay"], ["C", "Best value"], ["A", "Easy on the budget"],
+    ]);
+  });
+});

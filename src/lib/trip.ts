@@ -21,7 +21,21 @@ export interface Trip {
   cabin: Cabin;
   /** Flights the traveller has chosen, by leg id. */
   picks?: Record<string, FlightPick>;
+  /** Places the traveller saved, by city code. */
+  saved?: Record<string, SavedPlace[]>;
+  /** The latest AI day-by-day plan. */
+  plan?: import("./ai/schema").SavedPlan;
 }
+
+export interface SavedPlace {
+  key: string; // lower-cased name; stable across guide refreshes
+  name: string;
+  category: import("./places/types").PlaceCategory;
+  lat?: number;
+  lon?: number;
+}
+
+export const placeKey = (name: string) => name.trim().toLowerCase();
 
 export interface FlightPick {
   offerId: string;

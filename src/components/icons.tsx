@@ -72,3 +72,34 @@ export const MonitorIcon = ({ size, className }: P) => (
 export const BoltIcon = ({ size, className }: P) => (
   <svg {...base(size)} className={className}><path d="M13 3 5 13h6l-1 8 8-10h-6l1-8Z" /></svg>
 );
+
+export const BedIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M3 18V7M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5" /><circle cx="7" cy="11" r="1.6" /></svg>
+);
+export const ColumnsIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M3 9 12 4l9 5M4 9h16M6 9v9M10 9v9M14 9v9M18 9v9M3 20h18" /></svg>
+);
+export const CompassIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z" /></svg>
+);
+export const ForkIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 21V3c-2 1.5-3 4-3 7v3h3" /></svg>
+);
+export const GlassIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M6 3h12l-1 7a5 5 0 0 1-10 0L6 3ZM12 15v6M8 21h8M6.5 7h11" /></svg>
+);
+export const BagIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M5 8h14l-1 12H6L5 8ZM9 8V6a3 3 0 0 1 6 0v2" /></svg>
+);
+export const HeartIcon = ({ size, className, filled }: P & { filled?: boolean }) => (
+  <svg {...base(size)} className={className} fill={filled ? "currentColor" : "none"}><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z" /></svg>
+);
+export const MapIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="m9 4-6 2v14l6-2 6 2 6-2V4l-6 2-6-2ZM9 4v14M15 6v14" /></svg>
+);
+export const ListIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></svg>
+);
+export const SparkIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18" /></svg>
+);
