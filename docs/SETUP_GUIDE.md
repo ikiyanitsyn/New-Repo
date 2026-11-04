@@ -127,13 +127,13 @@ Docs: <https://serpapi.com/google-flights-api>
 
 ```
 GEMINI_API_KEY=paste-your-key-here
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.5-flash
 ```
 
 **Check the key on its own** (macOS/Linux; replace `YOUR_KEY`):
 
 ```bash
-curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent" -H "x-goog-api-key: YOUR_KEY" -H "Content-Type: application/json" -d '{"contents":[{"parts":[{"text":"Say hello in Mandarin"}]}]}'
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent" -H "x-goog-api-key: YOUR_KEY" -H "Content-Type: application/json" -d '{"contents":[{"parts":[{"text":"Say hello in Mandarin"}]}]}'
 ```
 
 You should get back JSON containing a greeting. If you see "model not found", open <https://ai.google.dev/gemini-api/docs/models>, pick a current **Flash** model and put its name in `GEMINI_MODEL`.

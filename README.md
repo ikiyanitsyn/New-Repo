@@ -38,14 +38,17 @@ src/
     TripBuilder.tsx       itinerary panel: travellers, stops, legs, totals
     LegPanel.tsx          detail for the selected leg (fares or ground options)
     FlightResults.tsx     Best / Cheapest / Fastest, nonstop filter, slider
+    CityExplorer.tsx      per-city screen: stays, sights, food, with list ⇄ map
+    CityMap.tsx           OpenFreeMap street map with category pins
   lib/
     cities.ts             launch city list with airport codes
     trip.ts, tripReducer  trip model: legs, dates, edits
     ground.ts             rail schedules on file and bus/car/ferry estimates
     flights/              providers (Travelpayouts, SerpApi, sample), ranking, booking links
+    places/               Wikivoyage listing parser, city guide fetcher, map and hotel links
 docs/                     setup guide and roadmap
 ```
 
 ## Data and credits
 
-Country shapes: Natural Earth via `world-atlas`. Fares: Travelpayouts (Aviasales) and SerpApi (Google Flights). Rail times and fares are typical figures for planning; always confirm with the operator before you travel.
+Country shapes: Natural Earth via `world-atlas`. Street maps: OpenFreeMap, © OpenStreetMap contributors. Places: Wikivoyage, text CC BY-SA. Fares: Travelpayouts (Aviasales) and SerpApi (Google Flights). Rail times and fares are typical figures for planning; always confirm with the operator before you travel.

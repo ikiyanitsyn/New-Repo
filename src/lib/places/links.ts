@@ -1,0 +1,39 @@
+import type { City } from "../cities";
+import type { Place } from "./types";
+
+const q = encodeURIComponent;
+
+export interface OutLink { label: string; url: string }
+
+/** Where to look a place up: maps, reviews, its own site. */
+export function placeLinks(p: Place, city: City): OutLink[] {
+  const links: OutLink[] = [];
+  const where = `${p.name}, ${city.name}`;
+  links.push({ label: "Google Maps", url: `https://www.google.com/maps/search/?api=1&query=${q(where)}` });
+  if (city.country === "CN") {
+    // Google Maps is blocked in mainland China and its streets are offset; Amap is the local standard.
+    links.push({ label: "Amap", url: `https://uri.amap.com/search?keyword=${q(p.alt || p.name)}&city=${q(city.localName ?? city.name)}&callnative=1` });
+    if (p.lat !== undefined && p.lon !== undefined)
+      links.push({ label: "Apple Maps", url: `https://maps.apple.com/?q=${q(p.name)}&ll=${p.lat},${p.lon}` });
+  }
+  links.push({ label: "TripAdvisor", url: `https://www.tripadvisor.com/Search?q=${q(where)}` });
+  if (p.url) links.push({ label: "Website", url: p.url });
+  return links;
+}
+
+/** Hotel searches pre-filled with this stop's dates and travellers. */
+export function staySearchLinks(city: City, checkin: string, checkout: string, adults: number): OutLink[] {
+  return [
+    {
+      label: "Booking.com",
+      url: `https://www.booking.com/searchresults.html?ss=${q(`${city.name}, ${city.countryName}`)}&checkin=${checkin}&checkout=${checkout}&group_adults=${adults}&no_rooms=1`,
+    },
+    { label: "Google Hotels", url: `https://www.google.com/travel/search?q=${q(`hotels in ${city.name}`)}&dates=${checkin},${checkout}` },
+    ...(city.country === "CN" || city.country === "HK" ? [{ label: "Trip.com", url: "https://www.trip.com/hotels/" }] : []),
+  ];
+}
+
+/** A small thumbnail from Wikimedia Commons for a guide image. */
+export function commonsThumb(file: string, width = 240): string {
+  return `https://commons.wikimedia.org/wiki/Special:FilePath/${q(file.replace(/^(File|Image):/i, ""))}?width=${width}`;
+}

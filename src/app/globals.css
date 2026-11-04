@@ -32,6 +32,12 @@
   --border-map: #bcc5c7;
   --graticule: rgb(19 26 34 / 0.07);
   --shadow: 0 1px 2px rgb(19 26 34 / 0.05), 0 12px 32px -12px rgb(19 26 34 / 0.18);
+  --pin-sleep: #8a6628;
+  --pin-see: #3b5998;
+  --pin-do: #2b7464;
+  --pin-eat: #a84f37;
+  --pin-drink: #7a4a8a;
+  --pin-buy: #56616c;
 
   --font-display: "Bodoni Moda Variable", "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
   --font-body: "Instrument Sans Variable", "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -67,6 +73,12 @@
     --border-map: #2c3a49;
     --graticule: rgb(235 231 223 / 0.05);
     --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.6);
+    --pin-sleep: #cfa760;
+    --pin-see: #8aa7e6;
+    --pin-do: #62b8a3;
+    --pin-eat: #e08a6f;
+    --pin-drink: #c094d0;
+    --pin-buy: #a7b0b9;
     color-scheme: dark;
   }
 }
@@ -95,6 +107,12 @@
   --border-map: #2c3a49;
   --graticule: rgb(235 231 223 / 0.05);
   --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.6);
+  --pin-sleep: #cfa760;
+  --pin-see: #8aa7e6;
+  --pin-do: #62b8a3;
+  --pin-eat: #e08a6f;
+  --pin-drink: #c094d0;
+  --pin-buy: #a7b0b9;
   color-scheme: dark;
 }
 
@@ -380,3 +398,67 @@ h1, h2, h3 {
   animation: shimmer 1.4s linear infinite;
 }
 
+
+/* ---------- City explorer ---------- */
+
+.explorer {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: grid;
+  grid-template-columns: minmax(360px, 460px) 1fr;
+  background: var(--bg);
+  animation: explorer-in 0.38s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes explorer-in { from { transform: translateX(6%); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.explorer-guide {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--surface-solid);
+  border-right: 1px solid var(--line);
+}
+
+.explorer-slide-next { animation: slide-next 0.32s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.explorer-slide-prev { animation: slide-prev 0.32s cubic-bezier(0.2, 0.7, 0.2, 1); }
+@keyframes slide-next { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes slide-prev { from { transform: translateX(-28px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.city-map-wrap { position: relative; min-height: 0; min-width: 0; background: var(--land); }
+.city-map { position: absolute; inset: 0; }
+.city-map.invert-tiles .maplibregl-canvas { filter: invert(0.9) hue-rotate(180deg) saturate(0.55) brightness(0.95); }
+.city-map-note { position: absolute; top: 12px; left: 12px; z-index: 2; }
+
+.place-pin {
+  width: 20px;
+  height: 20px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--pin);
+  border: 2px solid var(--surface-solid);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.place-pin.hover { transform: rotate(-45deg) scale(1.25); }
+.place-pin.active { transform: rotate(-45deg) scale(1.45); border-color: var(--ink); }
+
+@media (max-width: 860px) {
+  .explorer {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    grid-template-columns: 1fr;
+    grid-template-rows: 38vh 1fr;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .explorer { grid-template-rows: 34vh 1fr; }
+  .explorer .city-map-wrap { grid-row: 1; }
+  .explorer-guide { grid-row: 2; border-right: 0; border-top: 1px solid var(--line); overflow-y: auto; }
+  /* On phones the whole guide scrolls as one page instead of a small inner list. */
+  .explorer-guide > div { flex: none; min-height: auto; }
+  .explorer-guide .scroll-y { overflow: visible; flex: none; }
+}

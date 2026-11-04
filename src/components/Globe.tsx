@@ -8,6 +8,7 @@ import type { City } from "@/lib/cities";
 import { distanceKm, greatCircle, type LngLat } from "@/lib/geo";
 
 export interface GlobeStop {
+  id: string;
   city: City;
   label: string; // e.g. "1"
 }
@@ -18,6 +19,7 @@ interface Props {
   legs: Leg[];
   selectedLegId: string | null;
   onSelectLeg: (id: string) => void;
+  onOpenStop: (stopId: string) => void;
 }
 
 const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -91,12 +93,50 @@ function buildStyle(): StyleSpecification {
           "line-dasharray": [2, 1.5],
         },
       },
+      {
+        // A small plane at the middle of each flight, pointing at the destination.
+        id: "planes", type: "symbol", source: "routes", filter: ["==", ["get", "kind"], "air"],
+        layout: {
+          "symbol-placement": "line-center",
+          "icon-image": "plane",
+          "icon-size": ["case", ["==", ["get", "selected"], 1], 0.62, 0.48],
+          "icon-rotation-alignment": "map",
+          "icon-keep-upright": false,
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+        },
+      },
       { id: "routes-hit", type: "line", source: "routes", paint: { "line-color": "#000", "line-opacity": 0, "line-width": 16 } },
     ],
   };
 }
 
+/** Plane silhouette pointing east (+x), filled with the accent and outlined in the ocean colour. */
+function planeImage(): ImageData {
+  const p = palette();
+  const size = 64;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d")!;
+  const k = size / 24;
+  const pts = [
+    [22, 12], [20, 10.9], [14, 10.9], [9.2, 3], [7.2, 3], [10, 10.9], [5.2, 10.9], [3.2, 8.4], [1.8, 8.4], [2.7, 12],
+    [1.8, 15.6], [3.2, 15.6], [5.2, 13.1], [10, 13.1], [7.2, 21], [9.2, 21], [14, 13.1], [20, 13.1],
+  ];
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => (i ? ctx.lineTo(x * k, y * k) : ctx.moveTo(x * k, y * k)));
+  ctx.closePath();
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = p.ocean;
+  ctx.stroke();
+  ctx.fillStyle = p.accent;
+  ctx.fill();
+  return ctx.getImageData(0, 0, size, size);
+}
+
 function applyPalette(map: MLMap) {
+  if (map.hasImage("plane")) map.updateImage("plane", planeImage());
   const p = palette();
   map.setPaintProperty("ocean", "background-color", p.ocean);
   map.setPaintProperty("graticule", "line-color", p.graticule);
@@ -139,13 +179,15 @@ function panelPadding(el: HTMLElement) {
   return { top: 80, bottom: 80, left: Math.min(440, w * 0.32), right: Math.min(500, w * 0.36) };
 }
 
-export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg }: Props) {
+export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, onOpenStop }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markers = useRef<Marker[]>([]);
   const ready = useRef(false);
   const onSelectRef = useRef(onSelectLeg);
   onSelectRef.current = onSelectLeg;
+  const onOpenRef = useRef(onOpenStop);
+  onOpenRef.current = onOpenStop;
   const latest = useRef({ home, stops, legs, selectedLegId });
   latest.current = { home, stops, legs, selectedLegId };
 
@@ -187,6 +229,10 @@ export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg }:
         sync(map, maplibregl.Marker, true, reduced);
       });
 
+      map.on("styleimagemissing", (e) => {
+        if (e.id === "plane" && !map.hasImage("plane")) map.addImage("plane", planeImage(), { pixelRatio: 2 });
+      });
+
       map.on("click", "routes-hit", (e) => {
         const id = e.features?.[0]?.properties?.id;
         if (id) onSelectRef.current(String(id));
@@ -218,18 +264,19 @@ export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg }:
 
     markers.current.forEach((m) => m.remove());
     markers.current = [];
-    const place = (city: City, label: string, cls: string) => {
+    const place = (city: City, label: string, cls: string, stopId?: string) => {
       const el = document.createElement("button");
       el.type = "button";
       el.className = `city-marker ${cls}`;
-      el.setAttribute("aria-label", `${city.name}`);
+      el.setAttribute("aria-label", stopId ? `Explore ${city.name}` : city.name);
+      if (stopId) el.addEventListener("click", (ev) => { ev.stopPropagation(); onOpenRef.current(stopId); });
       el.title = city.name;
       el.innerHTML = `<span class="dot">${label}</span><span class="label">${city.name}</span>`;
       const off = cls === "home" ? -5 : -9;
       markers.current.push(new MarkerCtor({ element: el, anchor: "left", offset: [off, 0] }).setLngLat([city.lon, city.lat]).addTo(map));
     };
     place(home, "", "home");
-    stops.forEach((s) => place(s.city, s.label, ""));
+    stops.forEach((s) => place(s.city, s.label, "", s.id));
 
     if (fit && stops.length) frame(map, stops.map((s) => s.city), reduced ? 0 : 2400);
   }

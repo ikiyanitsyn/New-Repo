@@ -2,10 +2,11 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useState, useSyncExternalStore } from "react";
 import { getCity } from "@/lib/cities";
 import { isTrip, sampleTrip, stopsWithDates, tripLegs, type Trip } from "@/lib/trip";
 import { tripReducer } from "@/lib/tripReducer";
+import { CityExplorer } from "./CityExplorer";
 import { LegPanel } from "./LegPanel";
 import { ThemeToggle } from "./ThemeToggle";
 import { TripBuilder } from "./TripBuilder";
@@ -23,6 +24,17 @@ function loadSavedTrip(): Trip {
     }
   } catch {}
   return sampleTrip();
+}
+
+// The open city guide lives in the address (#explore-<stop>), so Back closes it and the link can be shared.
+const subscribeHash = (cb: () => void) => {
+  window.addEventListener("hashchange", cb);
+  return () => window.removeEventListener("hashchange", cb);
+};
+const readHash = () => window.location.hash;
+function replaceHash(hash: string) {
+  history.replaceState(null, "", window.location.pathname + window.location.search + hash);
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
 }
 
 export function Planner() {
@@ -49,10 +61,15 @@ export function Planner() {
   const activeLegId = legs.some((l) => l.id === selectedLegId) ? selectedLegId : (legs[0]?.id ?? null);
   const selectedLeg = legs.find((l) => l.id === activeLegId);
   const home = getCity(trip.home);
-  const globeStops = useMemo(
-    () => stopsWithDates(trip).map((s, i) => ({ city: s.cityInfo, label: String(i + 1) })),
-    [trip],
-  );
+  const datedStops = useMemo(() => stopsWithDates(trip), [trip]);
+  const globeStops = useMemo(() => datedStops.map((s, i) => ({ id: s.id, city: s.cityInfo, label: String(i + 1) })), [datedStops]);
+
+  const hash = useSyncExternalStore(subscribeHash, readHash, () => "");
+  const hashStop = hash.startsWith("#explore-") ? hash.slice("#explore-".length) : null;
+  const exploreStopId = datedStops.some((s) => s.id === hashStop) ? hashStop : null;
+  const openExplorer = (stopId: string) => { window.location.hash = `explore-${stopId}`; };
+  const moveExplorer = (stopId: string) => replaceHash(`#explore-${stopId}`);
+  const closeExplorer = () => replaceHash("");
 
   return (
     <div className="app">
@@ -73,9 +90,9 @@ export function Planner() {
       </header>
 
       <main className="stage">
-        <Globe home={home} stops={globeStops} legs={legs} selectedLegId={activeLegId} onSelectLeg={setSelectedLegId} />
+        <Globe home={home} stops={globeStops} legs={legs} selectedLegId={activeLegId} onSelectLeg={setSelectedLegId} onOpenStop={openExplorer} />
         <div className="stage-panels">
-          <TripBuilder trip={trip} dispatch={dispatch} legs={legs} selectedLegId={activeLegId} onSelectLeg={selectLeg} />
+          <TripBuilder trip={trip} dispatch={dispatch} legs={legs} selectedLegId={activeLegId} onSelectLeg={selectLeg} onExplore={openExplorer} />
           <LegPanel
             leg={selectedLeg}
             trip={trip}
@@ -83,6 +100,9 @@ export function Planner() {
             onPick={(legId, pick) => dispatch({ type: "pick", legId, pick })}
           />
         </div>
+        {exploreStopId && (
+          <CityExplorer stops={datedStops} stopId={exploreStopId} adults={trip.adults} onNavigate={moveExplorer} onClose={closeExplorer} />
+        )}
       </main>
     </div>
   );

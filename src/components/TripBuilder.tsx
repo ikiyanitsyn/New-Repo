@@ -8,7 +8,7 @@ import { fmtRange, fmtShort } from "@/lib/format";
 import { stopsWithDates, tripEndDate, tripNights, type FlightPick, type Leg, type Trip } from "@/lib/trip";
 import type { TripAction } from "@/lib/tripReducer";
 import { CityPicker } from "./CityPicker";
-import { CloseIcon, DownIcon, MinusIcon, MODE_ICON, MODE_LABEL, PlaneIcon, PlusIcon, UpIcon } from "./icons";
+import { ArrowIcon, CloseIcon, DownIcon, MinusIcon, MODE_ICON, MODE_LABEL, PlaneIcon, PlusIcon, UpIcon } from "./icons";
 
 interface Props {
   trip: Trip;
@@ -16,9 +16,10 @@ interface Props {
   legs: Leg[];
   selectedLegId: string | null;
   onSelectLeg: (id: string) => void;
+  onExplore: (stopId: string) => void;
 }
 
-export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg }: Props) {
+export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, onExplore }: Props) {
   const [adding, setAdding] = useState(false);
   const [morePax, setMorePax] = useState(trip.adults > 2);
   const stops = stopsWithDates(trip);
@@ -118,6 +119,9 @@ export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg }
                     <div className="mt-0.5 text-[12.5px] text-ink-2">
                       {fmtShort(s.arrive)} – {fmtShort(s.depart)} · {s.cityInfo.countryName}
                     </div>
+                    <button type="button" onClick={() => onExplore(s.id)} className="mt-1 inline-flex items-center gap-1 text-[12.5px] font-medium text-accent hover:underline">
+                      Stays, sights &amp; food <ArrowIcon size={12} />
+                    </button>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <Stepper value={s.nights} min={1} max={30} onChange={(v) => dispatch({ type: "nights", id: s.id, value: v })} label={`nights in ${s.cityInfo.name}`} suffix="n" />

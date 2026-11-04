@@ -40,12 +40,17 @@
 - Running transport total. The trip is saved in the browser.
 - Launch cities: 6 US departure cities; Beijing, Shanghai, Guangzhou, Shenzhen, Chengdu, Chongqing, Xi'an, Hangzhou, Guilin, Hong Kong; Tokyo, Seoul, Bangkok, Singapore; London, Paris, Rome, Barcelona, Amsterdam, Istanbul.
 
-### Phase 1 review feedback (to build next)
+### Phase 1 review feedback ✅ built in Phase 2
 - Add a small airplane marker riding each dotted flight line, so flights are distinct from train routes at a glance.
 - A separate swipe/slide-to screen per city: the local city map with recommended hotels and attractions pinned. Plan: a free map (OpenFreeMap street map) with pins, plus "open in Google Maps" links. Inside mainland China, Google Maps is blocked and its streets are offset, so also offer Amap/Apple Maps links there.
 
-### Phase 2: destination guides and maps
-- Street-level city maps when zoomed in (OpenFreeMap), on the city slide screen described above.
+### Phase 2: destination guides and maps ✅ ready for review
+- Planes on flight lines (pointing towards the destination; bigger on the selected flight).
+- City screen per stop: open it from "Stays, sights & food" in the itinerary or by clicking a city on the globe. Move between cities with the arrows, ← / → keys or a swipe on phones; Back closes it. Each city has its own shareable address (#explore-…).
+- Stay / See / Do / Eat / Drink tabs from Wikivoyage listings (free, no key), with Budget / Mid-range / Splurge filters, descriptions, prices, hours and photos where the guide has them.
+- Street map (OpenFreeMap) with coloured pins per category; picking a card flies to its pin and picking a pin highlights its card. Dark mode darkens the map.
+- Hotel searches pre-filled with that stop's dates and travellers (Booking.com, Google Hotels, Trip.com for China). Each place links to Google Maps and TripAdvisor, plus Amap and Apple Maps in mainland China.
+- Still to come from the original Phase 2 list: live transit routing (Transitous) and richer place data (ratings, opening status) from a places API.
 - Stay / See / Do / Eat tabs per city with map pins, ratings where licensed, price level and credited sources.
 - Live transit routing between and within cities where open data covers it.
 
