@@ -1,5 +1,7 @@
 # Intercontinental Nomad
 
+> This repository also contains **MarketMind**, a separate market-intelligence and paper-trading app with an AI advisor roundtable. See [marketmind/README.md](marketmind/README.md).
+
 Plan multi-city trips on one screen: fly into one city and home from another, add stops and how you'll travel between them, and compare fares by cheapest, fastest or the best balance of both, all on an interactive globe.
 
 **Status:** Phase 3 of 5. See [docs/ROADMAP.md](docs/ROADMAP.md).
