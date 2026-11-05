@@ -138,6 +138,18 @@ curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:g
 
 You should get back JSON containing a greeting. If you see "model not found", open <https://ai.google.dev/gemini-api/docs/models>, pick a current **Flash** model and put its name in `GEMINI_MODEL`.
 
+**Backup models (optional, usually leave alone)**
+
+When Gemini is busy ("experiencing high demand") or a model's free quota runs out, the planner waits briefly, retries, then switches to a backup model by itself. It finds backups automatically: it asks Google which Flash models your key can use (checked about every 6 hours). Free quotas are per model, so backups also help on busy days. The plan says quietly when a backup wrote it.
+
+To choose the backups yourself, add a comma-separated list (tried in order, after `GEMINI_MODEL`):
+
+```
+GEMINI_FALLBACK_MODELS=gemini-2.5-flash,gemini-2.5-flash-lite
+```
+
+Set it to `none` to turn backups off.
+
 **Staying free: read this part**
 
 - The free tier applies while the Google Cloud project has **no billing account**. **Don't** click *Set up billing*, *Upgrade* or *Activate full account*. Linking billing moves the project to the paid tier.
