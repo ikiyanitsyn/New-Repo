@@ -45,6 +45,13 @@
 
   --radius: 10px;
   --radius-sm: 6px;
+  --radius-lg: 18px; /* hero composers, photo cards (see docs/DESIGN.md) */
+  --shadow-lg: 0 2px 6px rgb(19 26 34 / 0.08), 0 28px 64px -24px rgb(19 26 34 / 0.4);
+
+  /* Fixed in both themes: text and marks laid over photos, which always sit under a dark scrim. */
+  --midnight: #0a0f16;
+  --porcelain: #fcfcfa;
+  --brass-light: #cfa760;
   color-scheme: light;
 }
 
@@ -73,6 +80,7 @@
     --border-map: #2c3a49;
     --graticule: rgb(235 231 223 / 0.05);
     --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.6);
+    --shadow-lg: 0 2px 6px rgb(0 0 0 / 0.35), 0 32px 72px -24px rgb(0 0 0 / 0.75);
     --pin-sleep: #cfa760;
     --pin-see: #8aa7e6;
     --pin-do: #62b8a3;
@@ -107,6 +115,7 @@
   --border-map: #2c3a49;
   --graticule: rgb(235 231 223 / 0.05);
   --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.6);
+  --shadow-lg: 0 2px 6px rgb(0 0 0 / 0.35), 0 32px 72px -24px rgb(0 0 0 / 0.75);
   --pin-sleep: #cfa760;
   --pin-see: #8aa7e6;
   --pin-do: #62b8a3;
@@ -343,6 +352,13 @@ h1, h2, h3 {
   .wordmark { font-size: 18px; }
   .topbar { gap: 8px; }
   .topbar .btn { padding-inline: 10px; }
+}
+
+/* Narrow phones (390px): wordmark, New trip, Concierge and theme must fit on one line. */
+@media (max-width: 420px) {
+  .topbar { padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); }
+  .wordmark { font-size: 16px; }
+  .topbar .btn { padding-inline: 8px; }
 }
 
 /* ---------- Globe markers ---------- */
