@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPrompt, daySlots } from "../ai/prompt";
+import { buildDaysPrompt, buildOverviewPrompt, chunkSlots, daySlots } from "../ai/prompt";
 import { extractJson, samplePlan, sanitize } from "../ai/plan";
 import { officialLinks } from "../ai/official";
 import { PlanRequest, PlanResponse } from "../ai/schema";
@@ -24,13 +24,21 @@ describe("AI planner", () => {
     expect(s.at(-1)!.note).toMatch(/fly home/);
   });
 
-  it("puts the request, saved places and day slots in the prompt", () => {
-    const { system, user } = buildPrompt(req, { BJS: [{ id: "1", category: "see", name: "Forbidden City" }] });
-    expect(system).toMatch(/ONE JSON object/);
-    expect(user).toMatch(/Food and temples/);
-    expect(user).toMatch(/Lama Temple/);
-    expect(user).toMatch(/Forbidden City \[Palaces & landmarks\]/);
-    expect(user).toMatch(/Day 6: 2027-04-14 in HKG/);
+  it("puts the request, saved places and day slots in the prompts", () => {
+    const places = { BJS: [{ id: "1", category: "see" as const, name: "Forbidden City" }] };
+    const [bjs, hkg] = chunkSlots(daySlots(req));
+    const days = buildDaysPrompt(req, bjs, places);
+    expect(days.system).toMatch(/ONE JSON object/);
+    expect(days.system).toMatch(/1-2 short sentences/);
+    expect(days.user).toMatch(/Food and temples/);
+    expect(days.user).toMatch(/Lama Temple/);
+    expect(days.user).toMatch(/Forbidden City \[Palaces & landmarks\]/);
+    expect(days.user).not.toMatch(/Day 4:/);
+    expect(buildDaysPrompt(req, hkg, places).user).toMatch(/Day 6: 2027-04-14 in HKG/);
+    const overview = buildOverviewPrompt(req);
+    expect(overview.system).toMatch(/beforeYouGo/);
+    expect(overview.system).not.toMatch(/"days"/);
+    expect(overview.user).toMatch(/Food and temples/);
   });
 
   it("extracts JSON even inside code fences", () => {

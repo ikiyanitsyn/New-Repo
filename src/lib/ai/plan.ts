@@ -4,16 +4,43 @@ import { cityPlaces } from "../places/wikivoyage";
 import { featureScore } from "../places/subcategory";
 import type { Place } from "../places/types";
 import { officialLinks } from "./official";
-import { buildPrompt, daySlots } from "./prompt";
-import { AiError, getProvider } from "./provider";
-import { PlanResponse, type PlanRequest } from "./schema";
+import { buildDaysPrompt, buildOverviewPrompt, chunkSlots, dayRangeLabel, daySlots, type SlotChunk } from "./prompt";
+import { AiError, getProvider, type AiProvider, type ProviderEvent } from "./provider";
+import { DaysReply, PlanResponse, type PlanDay, type PlanRequest } from "./schema";
 
 export interface PlanResult {
   source: "gemini" | "sample";
   response: PlanResponse;
   official: ReturnType<typeof officialLinks>;
   notice?: string;
+  /** Models that wrote the plan, in the order they first answered. */
+  models?: string[];
+  /** True when a backup model wrote some or all of the plan. */
+  usedBackup?: boolean;
 }
+
+/** A short, honest line about what the planner is doing right now. */
+export interface PlanProgress {
+  message: string;
+  done: number;
+  total: number;
+}
+
+export interface PlanOptions {
+  /** Cancels everything (e.g. the browser went away or the traveller tapped Cancel). */
+  signal?: AbortSignal;
+  onProgress?: (p: PlanProgress) => void;
+  /** Whole-request time budget. After it, unfinished parts are dropped and the rest returned. */
+  budgetMs?: number;
+  /** Time limit for each single model call. */
+  callTimeoutMs?: number;
+  /** How many model calls run at once (free tiers limit requests per minute). */
+  concurrency?: number;
+}
+
+export const PLAN_BUDGET_MS = 75_000;
+export const CALL_TIMEOUT_MS = 40_000;
+export const PLAN_CONCURRENCY = 3;
 
 /** Pull the JSON object out of a model reply, tolerating stray code fences. */
 export function extractJson(text: string): unknown {
@@ -37,9 +64,212 @@ export function sanitize(resp: PlanResponse, r: PlanRequest): PlanResponse {
   };
 }
 
-export async function makePlan(r: PlanRequest): Promise<PlanResult> {
+/** Run tasks with at most `limit` in flight. Results keep the input order. */
+export async function runLimited<T>(tasks: (() => Promise<T>)[], limit: number): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length);
+  let next = 0;
+  async function worker() {
+    while (next < tasks.length) {
+      const i = next++;
+      try {
+        results[i] = { status: "fulfilled", value: await tasks[i]() };
+      } catch (reason) {
+        results[i] = { status: "rejected", reason };
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+  return results;
+}
+
+/** Match a chunk reply to its slots: by date, or by position if the model got the dates wrong. */
+export function fitDays(days: PlanDay[], chunk: SlotChunk): (PlanDay | null)[] {
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  const anyDateMatch = chunk.slots.some((s) => byDate.has(s.date));
+  return chunk.slots.map((s, i) => {
+    const d = byDate.get(s.date) ?? (!anyDateMatch && days.length === chunk.slots.length ? days[i] : undefined);
+    return d ? { ...d, date: s.date, city: s.city } : null;
+  });
+}
+
+/** Group 0-based indices into "Days 6–9" style labels. */
+export function missingLabel(indices: number[]): string {
+  const sorted = [...indices].sort((a, b) => a - b);
+  const runs: [number, number][] = [];
+  for (const i of sorted) {
+    const last = runs[runs.length - 1];
+    if (last && last[1] === i - 1) last[1] = i;
+    else runs.push([i, i]);
+  }
+  const labels = runs.map(([a, b], k) => {
+    const l = dayRangeLabel(a, b - a + 1);
+    return k === 0 ? l : l.replace(/^Days?/, (w) => w.toLowerCase());
+  });
+  return labels.length <= 2 ? labels.join(" and ") : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
+}
+
+/** A place shouldn't be planned twice in the same city (parts are written in parallel). */
+function dropRepeats(days: PlanDay[]): PlanDay[] {
+  const seen = new Map<string, Set<string>>();
+  return days.map((d) => {
+    const used = seen.get(d.city) ?? new Set<string>();
+    seen.set(d.city, used);
+    const items = d.items.filter((it) => {
+      const key = it.placeName?.trim().toLowerCase();
+      if (!key) return true;
+      if (used.has(key)) return false;
+      used.add(key);
+      return true;
+    });
+    return { ...d, items: items.length ? items : d.items };
+  });
+}
+
+const ABORTED = (e: unknown) => e instanceof AiError && e.code === "aborted";
+
+/**
+ * Write the plan with the AI: one overview call plus one call per chunk of up to ~5 days,
+ * run concurrently (at most 3 at a time). Each part retries and falls back on its own; parts
+ * that fail or run past the time budget are left out with a notice, and the rest is returned.
+ */
+export async function writePlan(
+  r: PlanRequest,
+  provider: AiProvider,
+  placesByCity: Record<string, Place[]>,
+  opts: PlanOptions = {},
+): Promise<Omit<PlanResult, "official">> {
+  const budget = new AbortController();
+  const budgetTimer = setTimeout(() => budget.abort(), opts.budgetMs ?? PLAN_BUDGET_MS);
+  const signal = opts.signal ? AbortSignal.any([budget.signal, opts.signal]) : budget.signal;
+  const callTimeoutMs = opts.callTimeoutMs ?? CALL_TIMEOUT_MS;
+
+  const slots = daySlots(r);
+  const chunks = chunkSlots(slots);
+  const total = chunks.length + 1;
+  let done = 0;
+  const inflight: string[] = [];
+  const answered: { model: string; backup: boolean }[] = [];
+
+  const report = (message?: string) => {
+    const days = inflight.find((l) => l !== "overview");
+    const msg = message ?? (days ? `Writing ${days.toLowerCase()}…` : inflight.length ? "Writing the overview and travel brief…" : "Putting it together…");
+    opts.onProgress?.({ message: msg, done, total });
+  };
+  const onEvent = (e: ProviderEvent) => {
+    if (e.type === "retry") report("Gemini is busy. Trying again in a moment…");
+    else report(e.reason === "quota" ? "A model hit its free limit. Switching to a backup…" : "Gemini is busy. Switching to a backup model…");
+  };
+
+  /** Ask once, and once more with the error if the reply can't be used. */
+  async function ask<T>(prompt: { system: string; user: string }, read: (raw: unknown) => T | null): Promise<T> {
+    let lastError = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const extra = attempt ? `\n\nYour previous reply could not be used (${lastError}). Reply again with valid JSON matching the shape exactly.` : "";
+      const res = await provider.generateJson(prompt.system, prompt.user + extra, { signal, timeoutMs: callTimeoutMs, onEvent });
+      try {
+        const value = read(extractJson(res.text));
+        if (value !== null) {
+          answered.push({ model: res.model, backup: res.backup });
+          return value;
+        }
+        lastError = "it was missing the requested content";
+      } catch (e) {
+        lastError = e instanceof Error ? e.message.slice(0, 200) : "invalid JSON";
+      }
+    }
+    throw new AiError(`The AI reply didn't match the expected format (${lastError}).`, 502, "empty");
+  }
+
+  const track = <T>(label: string, fn: () => Promise<T>) => async () => {
+    if (signal.aborted) throw new AiError("Out of time.", 504, "timeout");
+    inflight.push(label);
+    report();
+    try {
+      return await fn();
+    } finally {
+      inflight.splice(inflight.indexOf(label), 1);
+      done++;
+      report();
+    }
+  };
+
+  const overviewTask = track("overview", () =>
+    ask(buildOverviewPrompt(r), (raw) => {
+      const p = PlanResponse.safeParse(raw);
+      if (!p.success) return null;
+      const o = sanitize({ ...p.data, days: [] }, r);
+      return o.title || o.summary || o.beforeYouGo.length || o.routeSuggestion ? o : null;
+    }),
+  );
+  const dayTasks = chunks.map((c) =>
+    track(dayRangeLabel(c.start, c.slots.length), () =>
+      ask(buildDaysPrompt(r, c, placesByCity), (raw) => {
+        const p = DaysReply.safeParse(raw);
+        if (!p.success) return null;
+        const fitted = fitDays(p.data.days.filter((d) => findCity(d.city)), c);
+        return fitted.some(Boolean) ? fitted : null;
+      }),
+    ),
+  );
+
+  let results: PromiseSettledResult<unknown>[];
+  try {
+    results = await runLimited<unknown>([overviewTask, ...dayTasks], opts.concurrency ?? PLAN_CONCURRENCY);
+  } finally {
+    clearTimeout(budgetTimer);
+  }
+  if (opts.signal?.aborted) throw new AiError("The request was cancelled.", 499, "aborted");
+  const timedOut = budget.signal.aborted;
+
+  const [overviewRes, ...dayRes] = results;
+  const days: (PlanDay | null)[] = new Array(slots.length).fill(null);
+  dayRes.forEach((res, k) => {
+    if (res.status !== "fulfilled") return;
+    (res.value as (PlanDay | null)[]).forEach((d, i) => (days[chunks[k].start + i] = d));
+  });
+  const written = days.filter((d): d is PlanDay => d !== null);
+  const overview = overviewRes.status === "fulfilled" ? (overviewRes.value as PlanResponse) : null;
+
+  if (!overview && !written.length) {
+    const errors = results.map((x) => (x.status === "rejected" ? x.reason : null)).filter(Boolean);
+    const best =
+      errors.find((e) => e instanceof AiError && ["auth", "quota", "missing"].includes(e.code ?? "")) ??
+      errors.find((e) => e instanceof AiError && !ABORTED(e) && e.code !== "timeout") ??
+      errors[0];
+    if (timedOut) throw new AiError("Gemini took too long to answer. Wait a moment, then try again.", 504, "timeout");
+    throw best instanceof AiError ? best : new AiError(best instanceof Error ? best.message : "The planner couldn't finish. Try again.");
+  }
+
+  const notices: string[] = [];
+  const missing = days.flatMap((d, i) => (d ? [] : [i]));
+  if (missing.length) notices.push(`${missingLabel(missing)} couldn't be written${timedOut ? " in time" : ""}.`);
+  if (!overview) notices.push(`The trip summary and "Before you go" brief couldn't be written${timedOut ? " in time" : ""}.`);
+  if (notices.length) notices.push("Tap Update to try again.");
+
+  const models = [...new Set(answered.map((a) => a.model))].sort((a, b) => Number(a !== provider.primaryModel) - Number(b !== provider.primaryModel));
+  const cities = [...new Set(slots.map((s) => getCity(s.city).name))];
+  const response: PlanResponse = {
+    title: overview?.title || (cities.length ? `${cities.join(", ")}` : "Your itinerary"),
+    summary: overview?.summary ?? "",
+    questions: overview?.questions ?? [],
+    routeSuggestion: overview?.routeSuggestion ?? null,
+    beforeYouGo: overview?.beforeYouGo ?? [],
+    days: dropRepeats(written),
+  };
+  return {
+    source: "gemini",
+    response,
+    notice: notices.length ? notices.join(" ") : undefined,
+    models,
+    usedBackup: answered.some((a) => a.backup),
+  };
+}
+
+export async function makePlan(r: PlanRequest, opts: PlanOptions = {}): Promise<PlanResult> {
+  const startedAt = Date.now();
   const cities = [...new Set(r.trip.stops.map((s) => s.city))];
   const official = officialLinks(cities);
+  opts.onProgress?.({ message: "Reading the city guides…", done: 0, total: 1 });
   const guides = await Promise.all(cities.map((c) => cityPlaces(c)));
   const placesByCity = Object.fromEntries(guides.map((g) => [g.city, g.places]));
 
@@ -47,27 +277,9 @@ export async function makePlan(r: PlanRequest): Promise<PlanResult> {
   if (!provider) {
     return { source: "sample", response: samplePlan(r, placesByCity), official, notice: "Sample plan. Add a Gemini key to get a personal itinerary (docs/SETUP_GUIDE.md)." };
   }
-
-  const { system, user } = buildPrompt(r, placesByCity);
-  let lastError = "";
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const extra = attempt ? `\n\nYour previous reply could not be used (${lastError}). Reply again with valid JSON matching the shape exactly.` : "";
-    let text: string;
-    try {
-      text = await provider.generateJson(system, user + extra);
-    } catch (e) {
-      if (e instanceof AiError) throw e;
-      throw new AiError(e instanceof Error ? e.message : "The AI request failed.");
-    }
-    try {
-      const parsed = PlanResponse.safeParse(extractJson(text));
-      if (parsed.success) return { source: "gemini", response: sanitize(parsed.data, r), official };
-      lastError = parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-    } catch (e) {
-      lastError = e instanceof Error ? e.message : "invalid JSON";
-    }
-  }
-  throw new AiError(`The AI reply didn't match the expected format (${lastError}). Please try again.`);
+  // The time budget covers the whole request, guide lookups included.
+  const budgetMs = Math.max(15_000, (opts.budgetMs ?? PLAN_BUDGET_MS) - (Date.now() - startedAt));
+  return { ...(await writePlan(r, provider, placesByCity, { ...opts, budgetMs })), official };
 }
 
 /** A plausible plan built from guide listings, used when no AI key is configured. */

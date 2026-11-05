@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { findCity } from "@/lib/cities";
 import { fmtDay, fmtShort } from "@/lib/format";
 import type { PlanDay, PlanItem, PlanResponse, SavedPlan } from "@/lib/ai/schema";
@@ -9,12 +9,15 @@ import type { TripAction } from "@/lib/tripReducer";
 import {
   ArrowIcon, BedIcon, ColumnsIcon, CompassIcon, ExternalIcon, ForkIcon, GlassIcon, SparkIcon, TrainIcon,
 } from "./icons";
+import { PlaneLoader } from "./PlaneLoader";
 
 interface Props {
   trip: Trip;
   dispatch: React.Dispatch<TripAction>;
   onClose: () => void;
   onOpenCity: (cityCode: string) => void;
+  /** Open a place from the plan in the city guide. */
+  onOpenPlace?: (cityCode: string, placeName: string) => void;
 }
 
 interface Official { country: string; links: { label: string; url: string }[] }
@@ -27,15 +30,74 @@ const KIND_ICON: Record<PlanItem["kind"], (p: { size?: number; className?: strin
   see: ColumnsIcon, do: CompassIcon, eat: ForkIcon, drink: GlassIcon, stay: BedIcon, travel: TrainIcon, free: SparkIcon,
 };
 
+/** The browser gives up after this long; the server stops itself at about 75 seconds. */
+const CLIENT_TIMEOUT_MS = 90_000;
+
+/** Honest, generic stages shown until the server reports what it's doing. */
+function stageFor(seconds: number): string {
+  if (seconds < 4) return "Reading your route and saved places…";
+  if (seconds < 12) return "Asking Gemini to write your days…";
+  if (seconds < 45) return "Writing your itinerary…";
+  return "Still writing. Gemini is slower than usual…";
+}
+
+class PlanFailure extends Error {}
+
+interface PlanReply {
+  source: SavedPlan["source"];
+  response: PlanResponse;
+  official?: Official[];
+  notice?: string;
+  models?: string[];
+  usedBackup?: boolean;
+}
+
+/** Read the planner's reply: a stream of progress lines then the result, or plain JSON. */
+async function readPlan(res: Response, onProgress: (message: string) => void): Promise<PlanReply> {
+  const type = res.headers.get("content-type") ?? "";
+  if (!type.includes("ndjson") || !res.body) {
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new PlanFailure(j.error || "The planner couldn't finish. Please try again.");
+    return j as PlanReply;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const lines = buffer.split("\n");
+    buffer = done ? "" : lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let msg: { type?: string; message?: string; error?: string } & Partial<PlanReply>;
+      try {
+        msg = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (msg.type === "progress" && msg.message) onProgress(msg.message);
+      else if (msg.type === "error") throw new PlanFailure(msg.error || "The planner couldn't finish. Please try again.");
+      else if (msg.type === "result") return msg as PlanReply;
+    }
+    if (done) break;
+  }
+  throw new PlanFailure("The planner stopped before finishing. Please try again.");
+}
+
 const stopSignature = (t: Trip) => t.stops.map((s) => `${s.city}:${s.nights}`).join(",") + `|${t.departDate}`;
 
-export function Concierge({ trip, dispatch, onClose, onOpenCity }: Props) {
+export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: Props) {
   const plan = trip.plan;
   const [request, setRequest] = useState(plan?.request ?? "");
   const [prefs, setPrefs] = useState<string[]>(plan?.preferences ?? []);
   const [answers, setAnswers] = useState<Record<string, string[]>>(plan?.answers ?? {});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [progress, setProgress] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const [view, setView] = useState<"days" | "before">("days");
 
   const outdated = plan && plan.forStops !== stopSignature(trip);
@@ -44,9 +106,23 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity }: Props) {
   const toggle = (list: string[], v: string, single?: string[]) =>
     list.includes(v) ? list.filter((x) => x !== v) : [...list.filter((x) => !single?.includes(x)), v];
 
+  function cancel() {
+    abortRef.current?.abort("cancel");
+  }
+
   async function generate() {
+    if (abortRef.current) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const hadPlan = Boolean(plan);
+    const startedAt = Date.now();
+    const tick = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    const giveUp = setTimeout(() => controller.abort("timeout"), CLIENT_TIMEOUT_MS);
     setBusy(true);
     setError(null);
+    setInfo(null);
+    setElapsed(0);
+    setProgress(null);
     const body = {
       request,
       preferences: prefs,
@@ -63,9 +139,13 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity }: Props) {
       },
     };
     try {
-      const res = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error || "The planner couldn't finish.");
+      const res = await fetch("/api/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson, application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      const j = await readPlan(res, setProgress);
       const saved: SavedPlan = {
         createdAt: new Date().toISOString(),
         source: j.source,
@@ -75,12 +155,26 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity }: Props) {
         forStops: stopSignature(trip),
         response: j.response as PlanResponse,
         official: j.official ?? [],
+        models: j.models,
+        usedBackup: j.usedBackup,
+        notice: j.source === "gemini" ? j.notice : undefined,
       };
       dispatch({ type: "plan", plan: saved });
       setView("days");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "The planner couldn't finish.");
+      if (controller.signal.aborted && controller.signal.reason === "cancel") {
+        setInfo(hadPlan ? "Stopped. Your previous plan is unchanged." : "Stopped. Nothing was changed.");
+      } else if (controller.signal.aborted) {
+        setError("This took longer than it should, so I stopped. Gemini may be busy: wait a minute, then try again.");
+      } else if (e instanceof PlanFailure) {
+        setError(e.message);
+      } else {
+        setError("Couldn't reach the planner. Check your connection, then try again.");
+      }
     } finally {
+      clearInterval(tick);
+      clearTimeout(giveUp);
+      abortRef.current = null;
       setBusy(false);
     }
   }
@@ -152,10 +246,20 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity }: Props) {
             <SparkIcon size={16} />
             {busy ? "Writing your itinerary…" : resp ? "Update my itinerary" : "Write my itinerary"}
           </button>
-          <p className="text-center text-[12.5px] text-ink-3">
-            {busy ? "This usually takes 15–40 seconds." : "Uses your route, dates and saved places."}
-          </p>
+          {busy ? (
+            <div className="flex flex-col items-center gap-2 pt-1" role="status">
+              <PlaneLoader label="Writing your itinerary" />
+              <p className="text-center text-[13.5px] text-ink-2">{progress ?? stageFor(elapsed)}</p>
+              <p className="data text-center text-[12px] text-ink-3">{elapsed}s · usually under a minute</p>
+              <button type="button" className="btn btn-ghost !h-9 !px-4 !text-[13.5px]" onClick={cancel}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <p className="text-center text-[12.5px] text-ink-3">Uses your route, dates and saved places.</p>
+          )}
           {error && <p className="rounded-md px-3 py-2 text-[13.5px] text-[var(--bad)]" style={{ background: "var(--surface-sunk)" }}>{error}</p>}
+          {info && <p className="rounded-md px-3 py-2 text-[13.5px] text-ink-2" style={{ background: "var(--surface-sunk)" }}>{info}</p>}
         </div>
       </div>
 
@@ -178,7 +282,16 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity }: Props) {
                 {outdated && <span className="chip chip-warn">Route changed since this plan. Update it.</span>}
               </div>
               <h2 className="display text-[38px] leading-[1.05]">{resp.title}</h2>
-              <p className="max-w-[62ch] text-[16px] leading-relaxed text-ink-2">{resp.summary}</p>
+              {resp.summary && <p className="max-w-[62ch] text-[16px] leading-relaxed text-ink-2">{resp.summary}</p>}
+              {plan!.notice && (
+                <p className="max-w-[62ch] rounded-md px-3 py-2 text-[13.5px] text-ink-2" style={{ background: "var(--surface-sunk)" }}>{plan!.notice}</p>
+              )}
+              {plan!.source === "gemini" && plan!.models && plan!.models.length > 0 && (
+                <p className="data text-[11.5px] text-ink-3">
+                  Written by {plan!.models.join(" and ")}
+                  {plan!.usedBackup ? (plan!.models.length > 1 ? " (a backup model helped)" : " (backup model)") : ""}
+                </p>
+              )}
             </header>
 
             {resp.routeSuggestion && resp.routeSuggestion.stops.length > 0 && (
@@ -234,7 +347,18 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity }: Props) {
                                     <span className="day-icon"><Icon size={15} /></span>
                                     <span className="min-w-0">
                                       <span className="eyebrow !text-[10px]">{it.time}</span>
-                                      <span className="block text-[15px] leading-snug">{it.title}</span>
+                                      {it.placeName && onOpenPlace ? (
+                                        <button
+                                          type="button"
+                                          className="block text-left text-[15px] leading-snug underline decoration-[var(--line-strong)] underline-offset-4 hover:text-accent hover:decoration-[var(--accent)]"
+                                          onClick={() => onOpenPlace(day.city, it.placeName!)}
+                                          aria-label={`${it.title}: open ${it.placeName} in the city guide`}
+                                        >
+                                          {it.title}
+                                        </button>
+                                      ) : (
+                                        <span className="block text-[15px] leading-snug">{it.title}</span>
+                                      )}
                                       {it.note && <span className="mt-0.5 block text-[13.5px] leading-relaxed text-ink-2">{it.note}</span>}
                                     </span>
                                   </li>

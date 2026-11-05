@@ -1,0 +1,78 @@
+/*
+ * A small plane flying along a dotted arc. Colours come from the theme tokens.
+ * Class names are prefixed so they stay unique even if this file is ever loaded as global CSS.
+ */
+.planeLoader {
+  position: relative;
+  width: 168px;
+  height: 64px;
+  flex: none;
+}
+
+.planeLoaderArc {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.planeLoaderTrack {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 0.1 7;
+}
+
+.planeLoaderOrigin {
+  fill: var(--ground);
+}
+
+.planeLoaderDestination {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.planeLoaderPlane {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+  offset-path: path("M 12 54 Q 84 -10 156 54");
+  offset-rotate: auto;
+  offset-anchor: center;
+  animation: planeLoaderFly 3.4s cubic-bezier(0.45, 0.05, 0.35, 1) infinite;
+}
+
+.planeLoaderPlane svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes planeLoaderFly {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  86% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planeLoaderPlane {
+    animation: none;
+    offset-distance: 50%;
+    opacity: 1;
+  }
+}
