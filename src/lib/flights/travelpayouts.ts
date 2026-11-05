@@ -1,4 +1,4 @@
-import { getCity } from "../cities";
+import { flightCodeOf, getCity } from "../cities";
 import { airlineName } from "./airlines";
 import type { FlightOffer, FlightQuery } from "./types";
 
@@ -33,8 +33,9 @@ interface TpResponse {
 
 async function call(q: FlightQuery, departureAt: string, token: string): Promise<TpItem[]> {
   const params = new URLSearchParams({
-    origin: q.from,
-    destination: q.to,
+    // City codes can be internal (e.g. Kyoto); search the IATA code that serves them.
+    origin: flightCodeOf(getCity(q.from)),
+    destination: flightCodeOf(getCity(q.to)),
     departure_at: departureAt,
     one_way: "true",
     direct: String(q.directOnly),
