@@ -8,7 +8,8 @@ import { isTrip, sampleTrip, stopsWithDates, tripLegs, type Trip } from "@/lib/t
 import { tripReducer } from "@/lib/tripReducer";
 import { CityExplorer } from "./CityExplorer";
 import { Concierge } from "./Concierge";
-import { SparkIcon } from "./icons";
+import { PlusIcon, SparkIcon } from "./icons";
+import { Landing } from "./Landing";
 import { LegPanel } from "./LegPanel";
 import { ThemeToggle } from "./ThemeToggle";
 import { TripBuilder } from "./TripBuilder";
@@ -17,7 +18,7 @@ const Globe = dynamic(() => import("./Globe"), { ssr: false, loading: () => <div
 
 const STORAGE_KEY = "in:trip:v1";
 
-function loadSavedTrip(): Trip {
+function readSavedTrip(): Trip | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -25,7 +26,7 @@ function loadSavedTrip(): Trip {
       if (isTrip(t)) return t;
     }
   } catch {}
-  return sampleTrip();
+  return null;
 }
 
 // The open city guide lives in the address (#explore-<stop>), so Back closes it and the link can be shared.
@@ -41,14 +42,17 @@ function replaceHash(hash: string) {
 
 export function Planner() {
   // Restore the trip saved on this device (Phase 4 adds accounts and cloud saves).
-  const [trip, dispatch] = useReducer(tripReducer, undefined, loadSavedTrip);
+  const [trip, dispatch] = useReducer(tripReducer, undefined, () => readSavedTrip() ?? sampleTrip());
   const [selectedLegId, setSelectedLegId] = useState<string | null>("outbound");
+  // First visit (nothing saved): show the opening page, and don't save the example until they move on.
+  const [started, setStarted] = useState(() => readSavedTrip() !== null);
 
   useEffect(() => {
+    if (!started) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(trip));
     } catch {}
-  }, [trip]);
+  }, [trip, started]);
 
   // On phones the fares panel sits below the itinerary, so bring it into view.
   const selectLeg = (id: string) => {
@@ -70,8 +74,11 @@ export function Planner() {
   const hashStop = hash.startsWith("#explore-") ? hash.slice("#explore-".length) : null;
   const exploreStopId = datedStops.some((s) => s.id === hashStop) ? hashStop : null;
   const conciergeOpen = hash === "#concierge";
+  // The opening page: #start, or a first visit with nothing else asked for.
+  const landingOpen = hash === "#start" || (!started && !conciergeOpen && !exploreStopId);
   const openExplorer = (stopId: string) => { window.location.hash = `explore-${stopId}`; };
-  const openConcierge = () => { window.location.hash = "concierge"; };
+  const openConcierge = () => { setStarted(true); window.location.hash = "concierge"; };
+  const showPlanner = () => { setStarted(true); setSelectedLegId("outbound"); replaceHash(""); };
   const openCityFromPlan = (cityCode: string) => {
     const stop = datedStops.find((s) => s.city === cityCode);
     if (stop) replaceHash(`#explore-${stop.id}`);
@@ -86,7 +93,10 @@ export function Planner() {
           Intercontinental <em>Nomad</em>
         </Link>
         <nav className="flex items-center gap-1 text-[13.5px]" aria-label="Main">
-          <button type="button" className={`btn btn-ghost hidden sm:inline-flex ${!conciergeOpen ? "!text-ink" : ""}`} aria-current={!conciergeOpen ? "page" : undefined} onClick={() => replaceHash("")}>Route</button>
+          <button type="button" className={`btn btn-ghost ${landingOpen ? "!text-ink" : ""}`} aria-current={landingOpen ? "page" : undefined} onClick={() => { window.location.hash = "start"; }}>
+            <PlusIcon size={15} className="text-accent" /> <span className="sr-only sm:not-sr-only">New trip</span>
+          </button>
+          <button type="button" className={`btn btn-ghost hidden sm:inline-flex ${!conciergeOpen && !landingOpen ? "!text-ink" : ""}`} aria-current={!conciergeOpen && !landingOpen ? "page" : undefined} onClick={showPlanner}>Route</button>
           <button type="button" className={`btn btn-ghost ${conciergeOpen ? "!text-ink" : ""}`} aria-current={conciergeOpen ? "page" : undefined} onClick={openConcierge}>
             <SparkIcon size={15} className="text-accent" /> Concierge
           </button>
@@ -100,6 +110,9 @@ export function Planner() {
         </nav>
       </header>
 
+      {landingOpen ? (
+        <Landing trip={trip} dispatch={dispatch} hasSavedTrip={started} onPlan={showPlanner} onContinue={showPlanner} onConcierge={openConcierge} />
+      ) : (
       <main className="stage">
         <Globe home={home} stops={globeStops} legs={legs} selectedLegId={activeLegId} onSelectLeg={setSelectedLegId} onOpenStop={openExplorer} />
         <div className="stage-panels">
@@ -124,6 +137,7 @@ export function Planner() {
         )}
         {conciergeOpen && <Concierge trip={trip} dispatch={dispatch} onClose={closeExplorer} onOpenCity={openCityFromPlan} />}
       </main>
+      )}
     </div>
   );
 }
