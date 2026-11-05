@@ -49,3 +49,52 @@ export interface PlacesResult {
   fetchedAt: string;
   error?: string;
 }
+
+/** Traveller's comfort level, from the concierge's preferences. */
+export type Comfort = "Good value" | "Comfortable" | "Luxury";
+
+export interface PlaceReview {
+  author: string;
+  /** Link to the author's profile at the provider (required attribution for some providers). */
+  authorUrl?: string;
+  /** Stars the reviewer gave, 1 to 5. */
+  rating?: number;
+  /** Human-readable age, e.g. "2 months ago". */
+  when?: string;
+  /** ISO date, when the provider gives one. */
+  publishTime?: string;
+  text: string;
+}
+
+export interface PlaceRating {
+  /** Average stars, 1 to 5. */
+  rating?: number;
+  /** Number of ratings behind the average. */
+  count?: number;
+  /** 0 free, 1 inexpensive ... 4 very expensive. */
+  priceLevel?: 0 | 1 | 2 | 3 | 4;
+  /** The place's page at the provider (link-back for attribution). */
+  url?: string;
+  reviews: PlaceReview[];
+}
+
+export interface RatingsProviderInfo {
+  id: string;
+  /** Name to credit, e.g. "Google Maps". */
+  name: string;
+  /**
+   * Whether the provider's terms let its ratings appear on a non-provider map.
+   * Google's terms don't allow Google Maps content on other maps, so stay pins
+   * show the guide's price instead.
+   */
+  showOnMap: boolean;
+}
+
+export interface RatingsResult {
+  /** Null when no ratings provider is configured; the guide works without one. */
+  provider: RatingsProviderInfo | null;
+  /** By guide place id. Null: looked up, no confident match. Missing: not looked up. */
+  ratings: Record<string, PlaceRating | null>;
+  /** Why some places were skipped, e.g. the daily safety limit. */
+  note?: string;
+}

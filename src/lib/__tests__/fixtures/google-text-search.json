@@ -1,0 +1,68 @@
+{
+  "_comment": "Hand-written fixture in the shape of a Places API (New) Text Search response. Not real data.",
+  "places": [
+    {
+      "id": "ChIJ-fixture-far-branch",
+      "displayName": { "text": "Siji Minfu Roast Duck (Wangfujing)", "languageCode": "en" },
+      "location": { "latitude": 39.9131, "longitude": 116.4108 },
+      "rating": 4.5,
+      "userRatingCount": 900,
+      "googleMapsUri": "https://maps.google.com/?cid=1"
+    },
+    {
+      "id": "ChIJ-fixture-dadong",
+      "displayName": { "text": "Da Dong Roast Duck (Dongsishitiao)", "languageCode": "en" },
+      "location": { "latitude": 39.93295, "longitude": 116.43395 },
+      "rating": 4.36,
+      "userRatingCount": 2310,
+      "priceLevel": "PRICE_LEVEL_EXPENSIVE",
+      "googleMapsUri": "https://maps.google.com/?cid=2",
+      "reviews": [
+        {
+          "name": "places/ChIJ-fixture-dadong/reviews/a",
+          "relativePublishTimeDescription": "2 months ago",
+          "rating": 5,
+          "text": { "text": "Crisp duck carved at the table. Book ahead for dinner.", "languageCode": "en" },
+          "originalText": { "text": "Crisp duck carved at the table. Book ahead for dinner.", "languageCode": "en" },
+          "authorAttribution": { "displayName": "Test Reviewer A", "uri": "https://www.google.com/maps/contrib/1", "photoUri": "https://example.org/a.png" },
+          "publishTime": "2026-09-01T10:00:00Z"
+        },
+        {
+          "name": "places/ChIJ-fixture-dadong/reviews/b",
+          "relativePublishTimeDescription": "a week ago",
+          "rating": 4,
+          "text": { "text": "", "languageCode": "en" },
+          "authorAttribution": { "displayName": "Empty Review" }
+        },
+        {
+          "name": "places/ChIJ-fixture-dadong/reviews/c",
+          "relativePublishTimeDescription": "3 months ago",
+          "rating": 4,
+          "originalText": { "text": "服务很好", "languageCode": "zh" },
+          "authorAttribution": { "displayName": "Test Reviewer C", "uri": "https://www.google.com/maps/contrib/3" },
+          "publishTime": "2026-08-01T10:00:00Z"
+        },
+        {
+          "name": "places/ChIJ-fixture-dadong/reviews/d",
+          "relativePublishTimeDescription": "4 months ago",
+          "rating": 3,
+          "text": { "text": "Good but pricey.", "languageCode": "en" },
+          "authorAttribution": { "displayName": "  " }
+        },
+        {
+          "name": "places/ChIJ-fixture-dadong/reviews/e",
+          "rating": 5,
+          "text": { "text": "A fourth usable review that should be left out.", "languageCode": "en" },
+          "authorAttribution": { "displayName": "Test Reviewer E" }
+        }
+      ]
+    },
+    {
+      "id": "ChIJ-fixture-other",
+      "displayName": { "text": "Dongsi Hutong Cafe", "languageCode": "en" },
+      "location": { "latitude": 39.9331, "longitude": 116.4341 },
+      "rating": 4.8,
+      "userRatingCount": 40
+    }
+  ]
+}
