@@ -1,0 +1,544 @@
+/*
+ * Printable itinerary.
+ * On screen: a quiet desk (app tokens, follows light/dark) holding sheets of
+ * paper. The paper always uses its own light palette, so what you see is what
+ * prints, even in dark mode.
+ * In print: US Letter, no toolbar, each city on a new page, the at-a-glance
+ * table on a landscape page with its header repeated, URLs after links.
+ *
+ * Borrowed from the owner's spreadsheet: a date gutter with the weekday in
+ * capitals under it, one accent-coloured headline per day, small grey field
+ * labels (Depart, Check-in, Nights, Notes) and a monospaced face for times,
+ * codes and money.
+ */
+
+.itin-root {
+  --paper: #fffefb;
+  --paper-ink: #1a1f26;
+  --paper-ink-2: #4a525c;
+  --paper-ink-3: #7d858e;
+  --paper-line: #e3e1da;
+  --paper-line-strong: #c9c5ba;
+  --paper-sunk: #f6f4ee;
+  --paper-accent: #8a6628;
+  --paper-accent-soft: #f4ecdd;
+  --paper-ground: #2b7464;
+  --paper-warn: #9a6216;
+
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  padding-bottom: 64px;
+}
+
+/* ---------- Toolbar (screen only) ---------- */
+
+.itin-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  gap: 10px;
+  padding: 10px max(16px, env(safe-area-inset-left)) 12px;
+  background: var(--surface);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  border-bottom: 1px solid var(--line);
+}
+
+.itin-toolbarRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  max-width: 11in;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.itin-toolbarTitle { flex: 1; min-width: 0; }
+.itin-toolbarActions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.itin-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.itin-options legend { float: left; margin-right: 4px; }
+
+.itin-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.itin-check input { accent-color: var(--accent); width: 15px; height: 15px; }
+
+.itin-segmented {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 2px;
+}
+.itin-segment {
+  position: relative;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.itin-segment input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.itin-segment[data-on] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.itin-segment:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.itin-notice {
+  max-width: 8.5in;
+  margin: 16px auto 0;
+  padding: 0 16px;
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+
+.itin-empty {
+  max-width: 34rem;
+  margin: 12vh auto 0;
+  padding: 0 16px;
+  text-align: center;
+  color: var(--ink-2);
+}
+.itin-emptyTitle {
+  font-family: var(--font-display);
+  font-size: 34px;
+  line-height: 1.15;
+  color: var(--ink);
+  margin: 8px 0 12px;
+}
+.itin-emptyActions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 22px; }
+
+/* ---------- Paper ---------- */
+
+.itin-paperStack {
+  display: grid;
+  justify-items: center;
+  gap: 28px;
+  padding: 28px 16px 0;
+}
+
+.itin-sheet {
+  width: 100%;
+  max-width: 8.5in;
+  min-width: 0;
+  background: var(--paper);
+  color: var(--paper-ink);
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 18px 40px -18px rgb(0 0 0 / 0.35);
+  padding: 0.7in 0.65in;
+  font-size: 10.5pt;
+  line-height: 1.45;
+  font-family: var(--font-body);
+}
+.itin-glanceSheet { max-width: 11in; }
+
+.itin-sheet a { color: var(--paper-accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+.itin-eyebrow {
+  font-size: 8pt;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper-ink-3);
+  margin: 0;
+}
+.itin-label {
+  display: block;
+  font-size: 7.5pt;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-ink-3);
+}
+
+.itin-h2 {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-size: 22pt;
+  line-height: 1.1;
+  margin: 4px 0 0;
+}
+.itin-h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 13pt;
+  margin: 0 0 6px;
+}
+
+.itin-num, .itin-code {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+.itin-code { font-size: 0.92em; letter-spacing: 0.02em; }
+.itin-muted { color: var(--paper-ink-3); }
+.itin-sub { display: block; color: var(--paper-ink-3); font-size: 0.88em; }
+.itin-small { font-size: 8.5pt; color: var(--paper-ink-2); margin: 10px 0 0; }
+.itin-right,
+.itin-sheet th.itin-right { text-align: right; }
+.itin-local { margin-left: 6px; color: var(--paper-ink-3); font-size: 0.9em; }
+.itin-cityName { font-weight: 600; }
+.itin-todo { color: var(--paper-warn); font-style: italic; }
+
+.itin-sheetHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--paper-line-strong);
+}
+.itin-sheetAside { color: var(--paper-ink-2); font-size: 9pt; }
+
+.itin-callout, .itin-calloutQuiet {
+  margin: 0 0 18px;
+  padding: 10px 14px;
+  border-left: 2px solid var(--paper-accent);
+  background: var(--paper-accent-soft);
+  font-size: 9.5pt;
+  color: var(--paper-ink-2);
+}
+.itin-calloutQuiet { background: var(--paper-sunk); border-left-color: var(--paper-line-strong); }
+
+/* ---------- Cover ---------- */
+
+.itin-cover {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  min-height: 9.5in;
+}
+.itin-coverTop {
+  padding-top: 0.6in;
+  border-top: 3px solid var(--paper-ink);
+}
+.itin-coverTitle {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-size: 46pt;
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+  margin: 10px 0 14px;
+}
+.itin-coverDates { font-size: 15pt; margin: 0; color: var(--paper-ink-2); }
+.itin-coverRoute {
+  font-family: var(--font-data);
+  font-size: 11pt;
+  letter-spacing: 0.06em;
+  color: var(--paper-accent);
+  margin: 22px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.itin-coverFacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px 24px;
+  margin: 0;
+  padding: 16px 0;
+  border-block: 1px solid var(--paper-line);
+}
+.itin-coverFacts dt, .itin-fields dt, .itin-totals dt {
+  font-size: 7.5pt;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-ink-3);
+}
+.itin-coverFacts dd { margin: 2px 0 0; }
+
+.itin-stopsTable, .itin-glance, .itin-ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5pt;
+}
+.itin-stopsTable th, .itin-glance th, .itin-ledger th {
+  text-align: left;
+  font-size: 7.5pt;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-ink-3);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--paper-line-strong);
+  white-space: nowrap;
+}
+.itin-stopsTable td, .itin-glance td, .itin-ledger td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--paper-line);
+  vertical-align: top;
+}
+.itin-stopsTable th:first-child, .itin-stopsTable td:first-child { padding-left: 0; width: 3.5em; color: var(--paper-ink-3); }
+
+.itin-coverFoot { margin-top: auto; font-size: 8.5pt; color: var(--paper-ink-3); }
+
+/* ---------- At a glance ---------- */
+
+.itin-tableScroll { overflow-x: auto; }
+.itin-glance { min-width: 760px; font-size: 8.75pt; line-height: 1.35; }
+.itin-colDate { width: 5.2em; }
+.itin-colDay { width: 3em; }
+.itin-colCity { width: 9.5em; }
+.itin-colStay { width: 10em; }
+.itin-colTx { width: 15em; }
+.itin-colCost { width: 5.5em; }
+
+.itin-glance tbody tr:nth-child(odd):not(.itin-totalRow) td { background: var(--paper-sunk); }
+.itin-glance td:first-child { border-left: 2px solid transparent; }
+.itin-glance tr[data-kind="arrive"] td:first-child,
+.itin-glance tr[data-kind="transfer"] td:first-child,
+.itin-glance tr[data-kind="travel"] td:first-child { border-left-color: var(--paper-accent); }
+
+.itin-gDate { display: block; font-family: var(--font-data); font-weight: 500; white-space: nowrap; }
+.itin-gWeek { display: block; font-family: var(--font-data); font-size: 0.85em; color: var(--paper-ink-3); letter-spacing: 0.08em; }
+.itin-gTitle { display: block; font-weight: 600; color: var(--paper-accent); }
+.itin-gHigh { display: block; color: var(--paper-ink-2); }
+
+.itin-tx + .itin-tx { margin-top: 4px; }
+.itin-txHead { display: flex; align-items: center; gap: 5px; }
+.itin-txIcon { flex: none; color: var(--paper-ground); }
+.itin-txMeta { display: block; color: var(--paper-ink-2); font-size: 0.92em; }
+
+.itin-totalRow td {
+  border-top: 1.5px solid var(--paper-ink);
+  border-bottom: 0;
+  font-weight: 600;
+  padding-top: 9px;
+}
+
+/* ---------- Day by day ---------- */
+
+.itin-cityBlock + .itin-cityBlock { margin-top: 30px; }
+.itin-cityHead {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--paper-line-strong);
+}
+.itin-citySheet .itin-eyebrow { margin-bottom: 10px; }
+.itin-cityTitle {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-size: 30pt;
+  line-height: 1.05;
+  margin: 0;
+}
+.itin-cityLocal { margin-left: 12px; font-family: var(--font-body); font-size: 0.45em; color: var(--paper-ink-3); vertical-align: middle; }
+
+.itin-fields { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; }
+.itin-fields dd { margin: 1px 0 0; }
+.itin-fieldWide { min-width: 12em; }
+
+.itin-day {
+  display: grid;
+  grid-template-columns: 5.5em 1fr;
+  gap: 0 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--paper-line);
+}
+.itin-dayGutter {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 0 0 10px;
+  border-left: 2px solid var(--paper-line-strong);
+}
+.itin-day[data-kind="arrive"] .itin-dayGutter,
+.itin-day[data-kind="transfer"] .itin-dayGutter,
+.itin-day[data-kind="travel"] .itin-dayGutter { border-left-color: var(--paper-accent); }
+.itin-dayDate { font-family: var(--font-data); font-size: 12.5pt; font-weight: 500; line-height: 1.1; white-space: nowrap; }
+.itin-dayWeek { font-family: var(--font-data); font-size: 8.5pt; letter-spacing: 0.1em; color: var(--paper-ink-3); }
+.itin-dayNum { margin-top: 6px; font-size: 7.5pt; letter-spacing: 0.12em; text-transform: uppercase; color: var(--paper-ink-3); }
+
+.itin-dayBody { min-width: 0; }
+.itin-dayTitle {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 14pt;
+  line-height: 1.2;
+  color: var(--paper-accent);
+  margin: 0 0 8px;
+}
+
+.itin-txBlock {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  background: var(--paper-sunk);
+  border-radius: 3px;
+}
+.itin-txBlockHead { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: 6px; }
+.itin-txNotes { margin: 6px 0 0; font-size: 8.5pt; font-style: italic; color: var(--paper-ink-2); }
+
+.itin-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.itin-item {
+  display: grid;
+  grid-template-columns: 5.2em 3.2em 1fr;
+  gap: 0 10px;
+  align-items: baseline;
+}
+.itin-itemTime { font-family: var(--font-data); font-size: 8.5pt; font-weight: 500; color: var(--paper-ink-2); }
+.itin-itemKind { font-size: 7pt; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--paper-ink-3); }
+.itin-itemMain { min-width: 0; }
+.itin-itemTitle { font-weight: 550; }
+.itin-itemNote { display: block; font-style: italic; font-size: 9pt; color: var(--paper-ink-2); margin-top: 1px; }
+
+/* Compact: tighter type, no page per city. */
+.itin-root[data-layout="compact"] .itin-sheet { font-size: 9.5pt; }
+.itin-root[data-layout="compact"] .itin-day { padding: 8px 0; grid-template-columns: 4.6em 1fr; }
+.itin-root[data-layout="compact"] .itin-dayTitle { font-size: 11.5pt; margin-bottom: 4px; }
+.itin-root[data-layout="compact"] .itin-cityTitle { font-size: 20pt; }
+.itin-root[data-layout="compact"] .itin-txBlock { padding: 5px 10px; margin-bottom: 6px; }
+.itin-root[data-layout="compact"] .itin-txBlockHead { margin-bottom: 2px; }
+.itin-root[data-layout="compact"] .itin-items { gap: 2px; }
+
+/* ---------- Costs ---------- */
+
+.itin-ledger { min-width: 620px; }
+.itin-ledger td.itin-num { white-space: nowrap; }
+.itin-totals {
+  display: grid;
+  justify-content: end;
+  gap: 4px;
+  margin: 18px 0 0;
+}
+.itin-totals div { display: flex; justify-content: space-between; gap: 40px; min-width: 18rem; }
+.itin-totals dd { margin: 0; }
+.itin-grand { border-top: 1.5px solid var(--paper-ink); padding-top: 6px; margin-top: 4px; font-size: 12pt; font-weight: 600; }
+.itin-grand dt { color: var(--paper-ink); align-self: center; }
+
+/* ---------- Places & before you go ---------- */
+
+.itin-placesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 22px 28px;
+}
+.itin-placeCity { break-inside: avoid; }
+.itin-placeGroup { margin-top: 8px; break-inside: avoid; }
+.itin-placeGroup ul { margin: 2px 0 0; padding-left: 1.1em; }
+.itin-placeGroup li { margin: 1px 0; }
+
+.itin-tip { padding: 12px 0; border-bottom: 1px solid var(--paper-line); break-inside: avoid; }
+.itin-tip p { margin: 0; }
+.itin-tip[data-important] { border-left: 2px solid var(--paper-warn); padding-left: 12px; }
+.itin-flag {
+  margin-left: 10px;
+  font-family: var(--font-body);
+  font-size: 7pt;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-warn);
+  vertical-align: middle;
+}
+.itin-bullets { margin: 6px 0 0; padding-left: 1.1em; color: var(--paper-ink-2); }
+.itin-official { margin-top: 22px; }
+
+@media (max-width: 640px) {
+  .itin-toolbar { position: static; }
+  .itin-sheet { padding: 28px 20px; }
+  .itin-cover { min-height: 0; }
+  .itin-coverTitle { font-size: 34pt; }
+  .itin-toolbarTitle { display: none; }
+  .itin-day { grid-template-columns: 4.4em 1fr; gap: 0 12px; }
+  .itin-item { grid-template-columns: 4.6em 1fr; }
+  .itin-itemKind { display: none; }
+}
+
+/* ---------- Print ---------- */
+
+@page {
+  size: letter;
+  margin: 0.6in 0.6in 0.7in;
+  @bottom-right {
+    content: counter(page) " / " counter(pages);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 7.5pt;
+    color: #7d858e;
+  }
+}
+@page :first {
+  @bottom-right { content: none; }
+}
+@page glance {
+  size: letter landscape;
+  margin: 0.5in 0.5in 0.6in;
+}
+
+@media print {
+  /* Paper is light even when the app is in dark mode. */
+  html:has(.itin-root),
+  html:has(.itin-root) body {
+    height: auto;
+    background: #fff !important;
+    color-scheme: light;
+  }
+
+  .itin-root {
+    --paper: #fff;
+    min-height: 0;
+    padding: 0;
+    background: #fff;
+    color: var(--paper-ink);
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .itin-noPrint { display: none !important; }
+
+  .itin-paperStack { display: block; padding: 0; }
+
+  .itin-sheet {
+    max-width: none;
+    padding: 0;
+    box-shadow: none;
+    border-radius: 0;
+    break-before: page;
+  }
+  .itin-sheet:first-child { break-before: auto; }
+
+  .itin-cover { min-height: 9.4in; }
+  .itin-coverTop { padding-top: 1.4in; }
+
+  .itin-glanceSheet { page: glance; }
+  .itin-tableScroll { overflow: visible; }
+  .itin-glance, .itin-ledger { min-width: 0; }
+  .itin-glance thead, .itin-ledger thead { display: table-header-group; }
+  .itin-glance tr, .itin-ledger tr, .itin-stopsTable tr { break-inside: avoid; }
+
+  .itin-cityHead { break-after: avoid; }
+  .itin-day, .itin-txBlock { break-inside: avoid; }
+  .itin-sheetHead { break-after: avoid; }
+
+  /* Compact: cities follow on without a new page. */
+  .itin-root[data-layout="compact"] .itin-cityBlock { break-before: auto; }
+
+  /* Show where links go, since paper can't be clicked. */
+  .itin-sheet a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-family: var(--font-data);
+    font-size: 7pt;
+    color: var(--paper-ink-3);
+    word-break: break-all;
+  }
+  .itin-sheet a { color: var(--paper-ink); text-decoration: none; }
+}
