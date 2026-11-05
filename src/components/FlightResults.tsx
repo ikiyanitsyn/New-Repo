@@ -6,7 +6,8 @@ import type { FlightOffer, FlightSearchResult } from "@/lib/flights/types";
 import { formatDuration, formatMiles, formatUsd } from "@/lib/geo";
 import { dayDiff, fmtDay, fmtTime } from "@/lib/format";
 import type { FlightPick, Leg, Trip } from "@/lib/trip";
-import { BoltIcon, ExternalIcon } from "./icons";
+import { BoltIcon, ExternalIcon, PlaneIcon } from "./icons";
+import { SplitFlap } from "./SplitFlap";
 
 interface Props {
   leg: Leg;
@@ -64,6 +65,11 @@ export function FlightResults({ leg, trip, pick, onPick }: Props) {
         <div className="flex items-center justify-between gap-2">
           <span className="eyebrow">{leg.kind === "outbound" ? "Outbound flight" : leg.kind === "return" ? "Return flight" : "Flight between stops"}</span>
           {source && <span className={`chip ${source.cls}`} title={source.detail}>{source.text}</span>}
+        </div>
+        <div className="flex items-center gap-2.5" aria-hidden>
+          <SplitFlap value={leg.from.code} size="lg" tone="brass" />
+          <PlaneIcon size={16} className="text-ink-3" />
+          <SplitFlap value={leg.to.code} size="lg" tone="brass" delayMs={160} />
         </div>
         <h2 className="display text-[26px] leading-tight">
           {leg.from.name} <span className="text-ink-3">to</span> {leg.to.name}
@@ -194,7 +200,8 @@ function OfferRow({
             {onFrontier && !rankLabel && !isCheapest && !isFastest && <span className="chip chip-muted" title="Nothing else is both cheaper and faster">Good value</span>}
           </div>
           <div className="data mt-1.5 flex items-center gap-2 text-[13px]">
-            <span>{fmtTime(o.departLocal)}</span>
+            {/* The top-ranked fare's departure flips in like a board; the rest stay quiet. */}
+            {rankLabel ? <SplitFlap value={fmtTime(o.departLocal)} size="sm" delayMs={300} /> : <span>{fmtTime(o.departLocal)}</span>}
             <span className="text-ink-3">{first?.from}</span>
             <StopsLine stops={o.stops} />
             <span className="text-ink-3">{last?.to}</span>
