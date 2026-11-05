@@ -73,7 +73,15 @@
 - Drag places into days; auto-fill empty days.
 - Before-you-go panel: visas (e.g. China's visa-free transit rules and the Hong Kong border), advisories, season, money, plugs, apps that work in China.
 
-### Phase 4: accounts, saving and sharing
+### Phase 3 review feedback ✅ built (six parallel workstreams)
+- Concierge: busy-model retries with automatic backup models, trimming instead of rejecting long text, parallel day chunks with a 75s budget, live progress, Cancel, plane loader, place names link to the guide.
+- Catalog: 96 cities (China, Macau, much of Europe and Asia), airport-less cities fly via the nearest airport, 81 rail pairs plus HK⇄Macau ferry/bus, official entry links per country, grouped city picker.
+- City guide: Google Places ratings and reviews (optional key), rating- and comfort-led picks, Airbnb-style stay cards with price pills, Booking.com first plus Trip.com in CN/HK/MO, deep links to a place's page.
+- Printable itinerary at /itinerary (PDF via print, CSV download), styled after the owner's spreadsheet.
+- Globe: polar band, rings and stacked arcs fixed; split-flap departure-board route codes.
+- Design analysis in docs/DESIGN.md and a Hopper-style opening page with Where · Dates · Guests.
+
+### Phase 4: accounts, saving and sharing (schema ready: supabase/schema.sql; waiting on the owner's Supabase keys)
 - Sign-in, My trips, view-only share links, Shared trips with live editing together.
 - Flight cache and live-search counter move to the database.
 - Installable app with offline access to saved trips.

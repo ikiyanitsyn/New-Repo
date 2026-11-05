@@ -154,6 +154,7 @@ export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, 
             {adding ? (
               <CityPicker
                 label="Add a city"
+                tripCities={trip.stops.map((s) => s.city)}
                 placeholder="Add a city: Tokyo, Guilin, Seoul…"
                 cities={DESTINATION_CITIES}
                 exclude={trip.stops.length ? [trip.stops[trip.stops.length - 1].city] : []}
