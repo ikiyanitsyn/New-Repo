@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Map as MLMap, Marker, GeoJSONSource, StyleSpecification } from "maplibre-gl";
-import type { FeatureCollection, LineString } from "geojson";
+import type { Map as MLMap, Marker, GeoJSONSource, StyleSpecification, SkySpecification } from "maplibre-gl";
+import type { Feature, FeatureCollection, Geometry, LineString, Point } from "geojson";
 import type { Leg } from "@/lib/trip";
 import type { City } from "@/lib/cities";
-import { distanceKm, greatCircle, type LngLat } from "@/lib/geo";
+import { angleDeg, arcBend, beyond, bentArc, fixAntimeridianPolygon, globeZoomToFit, lineMidpoint, type LngLat } from "@/lib/geo";
 
 export interface GlobeStop {
   id: string;
@@ -23,6 +23,7 @@ interface Props {
 }
 
 const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const prefersReducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function palette() {
   return {
@@ -31,52 +32,86 @@ function palette() {
     land: token("--land"),
     landActive: token("--land-active"),
     border: token("--border-map"),
-    graticule: token("--graticule"),
     accent: token("--accent"),
     ground: token("--ground"),
   };
 }
 
-function graticule(): FeatureCollection<LineString> {
-  const features: FeatureCollection<LineString>["features"] = [];
-  for (let lon = -180; lon < 180; lon += 20) {
-    const coords: LngLat[] = [];
-    for (let lat = -80; lat <= 80; lat += 4) coords.push([lon, lat]);
-    features.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } });
-  }
-  for (let lat = -60; lat <= 60; lat += 20) {
-    const coords: LngLat[] = [];
-    for (let lon = -180; lon <= 180; lon += 4) coords.push([lon, lat]);
-    features.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } });
-  }
-  return { type: "FeatureCollection", features };
-}
+/**
+ * MapLibre's atmosphere is a fixed blue-white scattering glow. Over this
+ * palette it reads as a pale haze on the limb and a lighter cap over whichever
+ * pole faces the viewer, in both themes, so it is switched off. The sky only
+ * shows when the map is pitched; it is set to the page colour for safety.
+ */
+const sky = (bg: string): SkySpecification => ({ "atmosphere-blend": 0, "sky-color": bg, "horizon-color": bg, "sky-horizon-blend": 0 });
+
+/** The selected leg (or every leg when none is selected) is drawn at full strength; the rest recede. */
+const emph = (id: string, selected: string | null) => (selected === null || id === selected ? 1 : 0);
+
+/** Long flights bow slightly to the right of travel, so an outbound and a return over the same corridor separate. */
+const legLine = (l: Leg): LngLat[] =>
+  bentArc(l.from, l.to, l.distanceKm > 3000 ? 128 : 32, l.mode === "flight" ? arcBend(l.distanceKm) : 0);
 
 function routes(legs: Leg[], selected: string | null): FeatureCollection<LineString> {
   return {
     type: "FeatureCollection",
     features: legs.map((l) => ({
       type: "Feature",
-      properties: { id: l.id, kind: l.mode === "flight" ? "air" : "ground", selected: l.id === selected ? 1 : 0 },
-      geometry: { type: "LineString", coordinates: greatCircle(l.from, l.to, l.distanceKm > 3000 ? 128 : 32) },
+      properties: { id: l.id, kind: l.mode === "flight" ? "air" : "ground", selected: l.id === selected ? 1 : 0, emph: emph(l.id, selected) },
+      geometry: { type: "LineString", coordinates: legLine(l) },
     })),
   };
 }
+
+/**
+ * One plane per flight, at the middle of its arc. (A `line-center` symbol is
+ * placed once per tile piece, so a long arc split across tiles or the
+ * antimeridian showed two or three planes stacked along it.)
+ */
+function planes(legs: Leg[], selected: string | null): FeatureCollection<Point> {
+  return {
+    type: "FeatureCollection",
+    features: legs
+      .filter((l) => l.mode === "flight")
+      .map((l) => {
+        const m = lineMidpoint(legLine(l));
+        return {
+          type: "Feature",
+          properties: { id: l.id, selected: l.id === selected ? 1 : 0, emph: emph(l.id, selected), rotate: m.bearing - 90 },
+          geometry: { type: "Point", coordinates: [m.lon, m.lat] },
+        };
+      }),
+  };
+}
+
+/** Unwrap country rings that jump across the antimeridian (see fixAntimeridianPolygon). */
+function fixCountries(fc: FeatureCollection): FeatureCollection {
+  const fix = (g: Geometry | null): Geometry | null => {
+    if (!g) return g;
+    if (g.type === "Polygon") return { ...g, coordinates: fixAntimeridianPolygon(g.coordinates as LngLat[][]) };
+    if (g.type === "MultiPolygon") return { ...g, coordinates: g.coordinates.map((p) => fixAntimeridianPolygon(p as LngLat[][])) };
+    return g;
+  };
+  return { ...fc, features: fc.features.map((f, i): Feature => ({ ...f, id: i, geometry: fix(f.geometry) as Geometry })) };
+}
+
+const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
 function buildStyle(): StyleSpecification {
   const p = palette();
   return {
     version: 8,
     projection: { type: "globe" },
-    sky: { "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 0.6, 5, 0.2, 7, 0] },
+    sky: sky(p.bg),
     sources: {
-      graticule: { type: "geojson", data: graticule() },
-      countries: { type: "geojson", data: { type: "FeatureCollection", features: [] }, attribution: "Natural Earth" },
-      routes: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+      countries: { type: "geojson", data: EMPTY, attribution: "Natural Earth" },
+      routes: { type: "geojson", data: EMPTY },
+      planes: { type: "geojson", data: EMPTY },
     },
     layers: [
+      // The background layer paints the whole sphere, including the caps beyond
+      // the Mercator limit (±85°), so the poles stay plain ocean.
       { id: "ocean", type: "background", paint: { "background-color": p.ocean } },
-      { id: "graticule", type: "line", source: "graticule", paint: { "line-color": p.graticule, "line-width": 0.8 } },
       { id: "land", type: "fill", source: "countries", paint: { "fill-color": ["case", ["boolean", ["feature-state", "active"], false], p.landActive, p.land] } },
       { id: "borders", type: "line", source: "countries", paint: { "line-color": p.border, "line-width": ["interpolate", ["linear"], ["zoom"], 1, 0.4, 5, 1] } },
       {
@@ -86,25 +121,29 @@ function buildStyle(): StyleSpecification {
       },
       {
         id: "routes-air", type: "line", source: "routes", filter: ["==", ["get", "kind"], "air"],
-        layout: { "line-cap": "round", "line-join": "round" },
+        layout: { "line-cap": "round", "line-join": "round", "line-sort-key": ["get", "emph"] },
         paint: {
           "line-color": p.accent,
-          "line-width": ["case", ["==", ["get", "selected"], 1], 3, 1.6],
+          "line-width": ["case", ["==", ["get", "selected"], 1], 2.6, 1.5],
+          "line-opacity": ["case", ["==", ["get", "emph"], 1], 1, 0.38],
           "line-dasharray": [2, 1.5],
         },
       },
       {
-        // A small plane at the middle of each flight, pointing at the destination.
-        id: "planes", type: "symbol", source: "routes", filter: ["==", ["get", "kind"], "air"],
+        // A small plane at the middle of each flight, pointing along the route.
+        id: "planes", type: "symbol", source: "planes",
         layout: {
-          "symbol-placement": "line-center",
           "icon-image": "plane",
-          "icon-size": ["case", ["==", ["get", "selected"], 1], 0.62, 0.48],
+          "icon-size": ["case", ["==", ["get", "selected"], 1], 0.62, 0.46],
+          "icon-rotate": ["get", "rotate"],
           "icon-rotation-alignment": "map",
-          "icon-keep-upright": false,
+          // Facing the viewer, so a plane near the globe's edge isn't squashed flat.
+          "icon-pitch-alignment": "viewport",
           "icon-allow-overlap": true,
           "icon-ignore-placement": true,
+          "symbol-sort-key": ["get", "emph"],
         },
+        paint: { "icon-opacity": ["case", ["==", ["get", "emph"], 1], 1, 0.45] },
       },
       { id: "routes-hit", type: "line", source: "routes", paint: { "line-color": "#000", "line-opacity": 0, "line-width": 16 } },
     ],
@@ -139,11 +178,11 @@ function applyPalette(map: MLMap) {
   if (map.hasImage("plane")) map.updateImage("plane", planeImage());
   const p = palette();
   map.setPaintProperty("ocean", "background-color", p.ocean);
-  map.setPaintProperty("graticule", "line-color", p.graticule);
   map.setPaintProperty("land", "fill-color", ["case", ["boolean", ["feature-state", "active"], false], p.landActive, p.land]);
   map.setPaintProperty("borders", "line-color", p.border);
   map.setPaintProperty("routes-ground", "line-color", p.ground);
   map.setPaintProperty("routes-air", "line-color", p.accent);
+  map.setSky(sky(p.bg));
 }
 
 /**
@@ -163,26 +202,71 @@ function frame(map: MLMap, places: { lat: number; lon: number }[], duration: num
     (Math.atan2(v[1], v[0]) * 180) / Math.PI,
     (Math.atan2(v[2], Math.hypot(v[0], v[1])) * 180) / Math.PI,
   ];
-  const spreadKm = Math.max(...places.map((p) => distanceKm(p, { lat: center[1], lon: center[0] })), 150);
+  const spreadDeg = Math.max(...places.map((p) => angleDeg(p, { lat: center[1], lon: center[0] })));
   const el = map.getContainer();
   const pad = panelPadding(el);
   const visiblePx = Math.min(el.clientWidth - pad.left - pad.right, el.clientHeight - pad.top - pad.bottom);
-  // At zoom z the globe is ~512·2^z px around; aim for the spread to fill ~45% of the visible gap.
-  const circumferencePx = (visiblePx * 0.32 * 40075) / (2 * spreadKm);
-  const zoom = Math.max(0.6, Math.min(6, Math.log2(circumferencePx / 512)));
-  map.easeTo({ center, zoom, padding: pad, duration, essential: true });
+  // The farthest place sits 24% (one region, so its surroundings show) to 44%
+  // (a long-haul leg, so the globe fills the gap) of the gap from the centre.
+  // No lower clamp: near the poles the Mercator zoom for a whole-globe view
+  // is well below 0 (MapLibre limits it itself).
+  const share = 0.2 + 0.24 * Math.min(1, spreadDeg / 60);
+  const zoom = Math.min(6, globeZoomToFit(spreadDeg, visiblePx * share, center[1]));
+  map.easeTo({ center, zoom, padding: pad, duration: prefersReducedMotion() ? 0 : duration, essential: true });
 }
 
+/**
+ * The free gap between the floating panels, measured from the panels
+ * themselves so it stays right at every breakpoint. On narrow screens the
+ * panels sit below the globe and don't overlap it.
+ */
 function panelPadding(el: HTMLElement) {
-  const w = el.clientWidth;
-  if (w < 860) return { top: 48, bottom: 48, left: 40, right: 40 };
-  return { top: 80, bottom: 80, left: Math.min(440, w * 0.32), right: Math.min(500, w * 0.36) };
+  const pad = { top: 56, bottom: 56, left: 32, right: 32 };
+  const g = el.getBoundingClientRect();
+  const panels = el.parentElement?.querySelectorAll<HTMLElement>(".stage-panels > .panel") ?? [];
+  for (const panel of panels) {
+    const r = panel.getBoundingClientRect();
+    const overlapsY = r.top < g.bottom - 40 && r.bottom > g.top + 40;
+    if (!overlapsY || r.width === 0 || r.width > g.width * 0.6) continue;
+    if (r.left + r.width / 2 < g.left + g.width / 2) pad.left = Math.max(pad.left, r.right - g.left + 24);
+    else pad.right = Math.max(pad.right, g.right - r.left + 24);
+  }
+  return pad;
+}
+
+interface Placed {
+  marker: Marker;
+  city: City;
+  inner: HTMLElement;
+  label: HTMLElement;
+}
+
+/**
+ * Fade places away as they turn towards the globe's edge, and take them out
+ * completely (including from clicks and the accessibility tree) once they are
+ * round the back. Without this MapLibre leaves occluded markers at 20% opacity,
+ * which is how "New York" showed through the North Pole.
+ */
+function updateVisibility(map: MLMap, placed: Placed[], LngLatCtor: typeof import("maplibre-gl").LngLat) {
+  const c = map.getCenter();
+  const center = { lat: c.lat, lon: c.lng };
+  for (const p of placed) {
+    const hidden = map.transform.isLocationOccluded(new LngLatCtor(p.city.lon, p.city.lat));
+    const near = beyond(center, p.city, 9);
+    const limb = !hidden && map.transform.isLocationOccluded(new LngLatCtor(near.lon, near.lat));
+    const state = hidden ? "hidden" : limb ? "limb" : "front";
+    if (p.inner.dataset.side === state) continue;
+    p.inner.dataset.side = state;
+    p.inner.style.opacity = hidden ? "0" : limb ? "0.45" : "1";
+    p.inner.style.visibility = hidden ? "hidden" : "visible";
+    p.label.style.opacity = state === "front" ? "1" : "0";
+  }
 }
 
 export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, onOpenStop }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
-  const markers = useRef<Marker[]>([]);
+  const placed = useRef<Placed[]>([]);
   const ready = useRef(false);
   const onSelectRef = useRef(onSelectLeg);
   onSelectRef.current = onSelectLeg;
@@ -198,7 +282,6 @@ export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, o
     (async () => {
       const maplibregl = (await import("maplibre-gl")).default;
       if (cancelled || !container.current) return;
-      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       const map = new maplibregl.Map({
         container: container.current,
         style: buildStyle(),
@@ -212,6 +295,7 @@ export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, o
       const markZoom = () => container.current?.setAttribute("data-zoomed", String(map.getZoom() >= 3.2));
       markZoom();
       map.on("zoomend", markZoom);
+      map.on("move", () => updateVisibility(map, placed.current, maplibregl.LngLat));
 
       map.on("load", async () => {
         ready.current = true;
@@ -221,12 +305,11 @@ export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, o
             fetch("/geo/countries-50m.json").then((r) => r.json()),
           ]);
           const fc = feature(topo, topo.objects.countries) as unknown as FeatureCollection;
-          fc.features.forEach((f, i) => (f.id = i));
-          (map.getSource("countries") as GeoJSONSource).setData(fc);
+          (map.getSource("countries") as GeoJSONSource).setData(fixCountries(fc));
         } catch {
           // The globe still works without country shapes.
         }
-        sync(map, maplibregl.Marker, true, reduced);
+        sync(map, maplibregl, true);
       });
 
       map.on("styleimagemissing", (e) => {
@@ -258,27 +341,35 @@ export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, o
     };
   }, []);
 
-  function sync(map: MLMap, MarkerCtor: typeof Marker, fit: boolean, reduced = false) {
+  function sync(map: MLMap, ml: typeof import("maplibre-gl"), fit: boolean) {
     const { home, stops, legs, selectedLegId } = latest.current;
     (map.getSource("routes") as GeoJSONSource | undefined)?.setData(routes(legs, selectedLegId));
+    (map.getSource("planes") as GeoJSONSource | undefined)?.setData(planes(legs, selectedLegId));
 
-    markers.current.forEach((m) => m.remove());
-    markers.current = [];
+    placed.current.forEach((p) => p.marker.remove());
+    placed.current = [];
     const place = (city: City, label: string, cls: string, stopId?: string) => {
+      // MapLibre sets opacity on the marker element itself, so the fading is
+      // done on the button inside it.
+      const wrap = document.createElement("div");
       const el = document.createElement("button");
       el.type = "button";
       el.className = `city-marker ${cls}`;
+      el.style.transition = "opacity 200ms ease, visibility 0s";
       el.setAttribute("aria-label", stopId ? `Explore ${city.name}` : city.name);
       if (stopId) el.addEventListener("click", (ev) => { ev.stopPropagation(); onOpenRef.current(stopId); });
       el.title = city.name;
-      el.innerHTML = `<span class="dot">${label}</span><span class="label">${city.name}</span>`;
+      el.innerHTML = `<span class="dot">${label}</span><span class="label" style="transition:opacity 200ms ease">${city.name}</span>`;
+      wrap.appendChild(el);
       const off = cls === "home" ? -5 : -9;
-      markers.current.push(new MarkerCtor({ element: el, anchor: "left", offset: [off, 0] }).setLngLat([city.lon, city.lat]).addTo(map));
+      const marker = new ml.Marker({ element: wrap, anchor: "left", offset: [off, 0], opacityWhenCovered: "0" }).setLngLat([city.lon, city.lat]).addTo(map);
+      placed.current.push({ marker, city, inner: el, label: el.querySelector<HTMLElement>(".label")! });
     };
     place(home, "", "home");
     stops.forEach((s) => place(s.city, s.label, "", s.id));
+    updateVisibility(map, placed.current, ml.LngLat);
 
-    if (fit && stops.length) frame(map, stops.map((s) => s.city), reduced ? 0 : 2400);
+    if (fit && stops.length) frame(map, stops.map((s) => s.city), 2400);
   }
 
   // Keep routes and markers in step with the trip.
@@ -290,7 +381,7 @@ export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, o
     if (!map || !ready.current) return;
     const fit = lastStopKey.current !== stopKey;
     lastStopKey.current = stopKey;
-    import("maplibre-gl").then(({ default: ml }) => sync(map, ml.Marker, fit));
+    import("maplibre-gl").then((ml) => sync(map, ml.default, fit));
   }, [stopKey, legKey, selectedLegId]);
 
   // Fly to the selected leg.

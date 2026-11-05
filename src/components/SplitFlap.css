@@ -1,0 +1,101 @@
+/*
+ * Split-flap (departure board) cells. Plain global CSS with an `sf-` prefix
+ * (CSS modules are not wired up in this project's Turbopack config).
+ * Deep ink cells with warm-white or brass characters in both themes.
+ */
+.sf {
+  --sf-bg: #161c24;
+  --sf-bg-2: #0f141a;
+  --sf-ink: #f1e9d8;
+  --sf-edge: rgb(255 255 255 / 0.09);
+  --sf-hinge: rgb(0 0 0 / 0.55);
+  --sf-flip: 48ms;
+  display: inline-flex;
+  gap: 0.12em;
+  vertical-align: middle;
+  font-family: var(--font-data);
+  font-weight: 500;
+  line-height: 1;
+}
+.sf-brass { --sf-ink: #dcb877; }
+
+/* On the dark panels the cells are lifted a little so they still read as tiles. */
+:root[data-theme="dark"] .sf {
+  --sf-bg: #26303c;
+  --sf-bg-2: #1d252f;
+  --sf-edge: rgb(255 255 255 / 0.14);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .sf {
+    --sf-bg: #26303c;
+    --sf-bg-2: #1d252f;
+    --sf-edge: rgb(255 255 255 / 0.14);
+  }
+}
+.sf-sm { font-size: 11.5px; }
+.sf-md { font-size: 14px; }
+.sf-lg { font-size: 20px; }
+
+.sf-cell {
+  --sf-h: 1.62em;
+  position: relative;
+  display: inline-block;
+  /* Fixed width: the layout never moves while characters flip. */
+  width: calc(1ch + 0.42em);
+  height: var(--sf-h);
+  border-radius: 0.2em;
+  background: linear-gradient(var(--sf-bg) 50%, var(--sf-bg-2) 50%);
+  box-shadow: inset 0 0 0 1px var(--sf-edge), 0 1px 1px rgb(0 0 0 / 0.18);
+  color: var(--sf-ink);
+  perspective: 6em;
+}
+.sf-gap { width: 0.45em; background: none; box-shadow: none; }
+
+/* The hinge across the middle. */
+.sf-cell:not(.sf-gap)::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - 0.5px);
+  height: 1px;
+  background: var(--sf-hinge);
+  z-index: 3;
+}
+
+.sf-half {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50%;
+  overflow: hidden;
+  backface-visibility: hidden;
+}
+.sf-half > span {
+  display: block;
+  height: var(--sf-h);
+  line-height: var(--sf-h);
+  text-align: center;
+}
+.sf-top { top: 0; border-radius: 0.2em 0.2em 0 0; background: var(--sf-bg); }
+.sf-bottom { bottom: 0; border-radius: 0 0 0.2em 0.2em; background: var(--sf-bg-2); }
+.sf-bottom > span { transform: translateY(-50%); }
+
+/* Old top half folds down, then the new bottom half lands. */
+.sf-fold {
+  z-index: 2;
+  transform-origin: 50% 100%;
+  animation: sf-fold calc(var(--sf-flip) / 2) ease-in forwards;
+}
+.sf-land {
+  z-index: 2;
+  transform-origin: 50% 0;
+  transform: rotateX(90deg);
+  animation: sf-land calc(var(--sf-flip) / 2) ease-out calc(var(--sf-flip) / 2) forwards;
+}
+@keyframes sf-fold { from { transform: rotateX(0deg); } to { transform: rotateX(-90deg); } }
+@keyframes sf-land { from { transform: rotateX(90deg); } to { transform: rotateX(0deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-fold, .sf-land { display: none; }
+}

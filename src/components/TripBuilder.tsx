@@ -8,6 +8,7 @@ import { fmtRange, fmtShort } from "@/lib/format";
 import { stopsWithDates, tripEndDate, tripNights, type FlightPick, type Leg, type Trip } from "@/lib/trip";
 import type { TripAction } from "@/lib/tripReducer";
 import { CityPicker } from "./CityPicker";
+import { SplitFlap } from "./SplitFlap";
 import { ArrowIcon, SparkIcon, CloseIcon, DownIcon, MinusIcon, MODE_ICON, MODE_LABEL, PlaneIcon, PlusIcon, UpIcon } from "./icons";
 
 interface Props {
@@ -208,9 +209,11 @@ function FlightLegRow({ leg, label, selected, onSelect, pick }: { leg: Leg; labe
         <PlaneIcon size={16} className="flex-none text-accent" />
         <span className="min-w-0 flex-1">
           <span className="eyebrow !text-[10px]">{label} flight · {fmtShort(leg.date)}</span>
-          <span className="data block text-[13.5px]">
-            {leg.from.code} <span className="text-ink-3">→</span> {leg.to.code}
-            <span className="ml-2 text-[12px] text-ink-3">{formatMiles(leg.distanceKm)}</span>
+          <span className="data mt-1 flex items-center gap-1.5 text-[13.5px]">
+            <SplitFlap value={leg.from.code} size="sm" label={`${leg.from.name} (${leg.from.code}) to`} />
+            <span className="text-ink-3" aria-hidden>→</span>
+            <SplitFlap value={leg.to.code} size="sm" delayMs={140} label={`${leg.to.name} (${leg.to.code})`} />
+            <span className="ml-1 text-[12px] text-ink-3">{formatMiles(leg.distanceKm)}</span>
           </span>
         </span>
         <span className="text-right text-[12.5px]">
