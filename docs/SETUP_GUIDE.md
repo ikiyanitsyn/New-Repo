@@ -185,10 +185,71 @@ Pricing: <https://supabase.com/pricing>
 
 ---
 
+## 7. Google Places: ratings and reviews in the city guide (optional)
+
+**What it is.** The city guide's listings come from Wikivoyage, which has no star ratings. With a Google Places key, the guide also shows each place's Google rating, how many people rated it, and up to three short reviews. The "Our picks" cards then lead with the best-rated places. **Without a key everything still works.** You just don't see ratings.
+
+**Why Google.** Its places database is the largest, and one request returns the rating, the number of ratings and the reviews together. The Tripadvisor Content API was the other option. It's being replaced by a new platform during 2026, and its rules don't allow the app to store answers at all. Foursquare charges for ratings from the first request.
+
+**The catch: a card on file.** Google requires a billing account (a credit or debit card) for this API, even when you stay inside the free allowance. The app's request type ("Text Search Enterprise + Atmosphere") includes **1,000 free requests a month**. Each place the app rates uses one request. The steps below add three safety stops so a bill can't happen by accident.
+
+> **Important:** use a **separate Google Cloud project** for this, not the one holding your Gemini key (section 4). The Gemini free tier only applies to projects *without* billing. Adding billing to that project would move Gemini to paid.
+
+**Sign up**
+
+1. Go to <https://console.cloud.google.com>. At the top, open the project picker and choose **New project**. Name it something like `nomad-places`.
+2. With that project selected, open **Billing** in the left menu. Link a billing account (add your card). Google may offer a free-trial credit; it's fine to accept.
+3. Open <https://console.cloud.google.com/apis/library/places.googleapis.com>. Make sure it says **Places API (New)**, then press **Enable**.
+4. Go to **APIs & Services → Credentials → Create credentials → API key**. Copy the key.
+5. Press **Edit API key**. Under **API restrictions** choose **Restrict key** and tick only **Places API (New)**. Save. A leaked key then can't be used for anything else.
+
+**Safety stop 1: a daily cap at Google (the important one)**
+
+1. Go to **APIs & Services → Places API (New) → Quotas & system limits**.
+2. Find the row for **Text Search requests per day** (the name may vary slightly). Tick it and press **Edit**.
+3. Set it to **30**. That's at most about 930 a month, under the 1,000 free. Google refuses requests past it, so the guide just shows no ratings until the next day.
+
+**Safety stop 2: a budget alert.** In **Billing → Budgets & alerts**, create a budget of **$1** with email alerts at 50% and 100%. It doesn't stop spending, but you'll hear about it right away.
+
+**Safety stop 3: the app's own limit.** The app counts its requests and stops at `GOOGLE_PLACES_DAILY_LIMIT` (30 by default). It also remembers answers for a day and only rates the places you're actually looking at. The app's count resets whenever the server restarts, so stop 1 is the one to rely on.
+
+**Add it** (in `.env.local`, and in Vercel's Environment Variables)
+
+```
+GOOGLE_PLACES_API_KEY=paste-your-key-here
+GOOGLE_PLACES_DAILY_LIMIT=30
+```
+
+Optional: `RATINGS_CACHE_HOURS=24` sets how long the app keeps a rating before asking again.
+
+**Check the key on its own** (macOS/Linux; replace `YOUR_KEY`):
+
+```bash
+curl -X POST "https://places.googleapis.com/v1/places:searchText" \
+  -H "Content-Type: application/json" -H "X-Goog-Api-Key: YOUR_KEY" \
+  -H "X-Goog-FieldMask: places.displayName,places.rating,places.userRatingCount" \
+  -d '{"textQuery":"Temple of Heaven, Beijing"}'
+```
+
+You should get back JSON with a name, a rating and a count. This uses one of your free requests.
+
+**Check it worked.** Open a city, then **Stay** or **Eat**. Within a second or two, cards show a star rating such as ★ 4.6 (1,203). Open a place to see its reviews, with the line "Rating and reviews from Google Maps".
+
+**What you'll see, and why**
+
+- Google's rules require a credit to Google Maps and each reviewer's name next to their review. The app shows both.
+- Google's rules don't allow its ratings on maps from other companies. The guide's map comes from OpenStreetMap, so the stay pins show the guide's price (e.g. ¥450) rather than the rating.
+- Some places in mainland China have few or no Google reviews. Those simply show no rating.
+
+Pricing and free caps: <https://developers.google.com/maps/billing-and-pricing/pricing> · Usage and billing: <https://developers.google.com/maps/documentation/places/web-service/usage-and-billing>
+
+---
+
 ## Staying-free checklist
 
-- [ ] No payment method on Google Cloud / AI Studio, SerpApi, Supabase or Vercel.
+- [ ] No payment method on the Gemini (AI Studio) project, SerpApi, Supabase or Vercel.
 - [ ] `SERPAPI_MONTHLY_LIMIT` set below the real SerpApi allowance.
+- [ ] Google Places (if used): the only project with billing, kept apart from the Gemini project. The key is restricted to Places API (New), the daily quota is set to 30 and a $1 budget alert is on.
 - [ ] Keys only in `.env.local` and Vercel's Environment Variables, never in code or chat.
 - [ ] If a key leaks, delete it in that service's dashboard and create a new one.
 

@@ -39,10 +39,23 @@ interface Props {
   places: Place[];
   activeId: string | null;
   hoverId: string | null;
+  /** Text for stay pins (rating or price). Stays get listing-style pills; other places keep coloured drop pins. */
+  pinLabels?: Record<string, string>;
   onSelect: (id: string) => void;
 }
 
-export default function CityMap({ city, places, activeId, hoverId, onSelect }: Props) {
+const BED_SVG =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19V6M3 15h18v4M21 15v-3a3 3 0 0 0-3-3h-8v6"/><circle cx="6.5" cy="11.5" r="1.5"/></svg>';
+
+/** The pill's content: its label, or a small bed when there's no rating or price to show. */
+function fillStayPin(el: HTMLElement, name: string, label: string | undefined) {
+  const inner = el.firstElementChild as HTMLElement;
+  if (label) inner.textContent = label;
+  else inner.innerHTML = BED_SVG;
+  el.setAttribute("aria-label", label ? `${name}, ${label}` : name);
+}
+
+export default function CityMap({ city, places, activeId, hoverId, pinLabels = {}, onSelect }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markers = useRef(new Map<string, Marker>());
@@ -103,6 +116,18 @@ export default function CityMap({ city, places, activeId, hoverId, onSelect }: P
 
   // Pins for the current list.
   const placeKey = places.map((p) => p.id).join(",");
+  const labelsRef = useRef(pinLabels);
+  useEffect(() => { labelsRef.current = pinLabels; });
+  const labelKey = places.map((p) => pinLabels[p.id] ?? "").join("|");
+
+  // Labels can arrive after the pins (ratings load lazily): update them in place, without refitting the map.
+  useEffect(() => {
+    for (const p of places) {
+      const el = markers.current.get(p.id)?.getElement();
+      if (el?.classList.contains("stay-pin")) fillStayPin(el, p.name, pinLabels[p.id]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labelKey]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
@@ -115,12 +140,20 @@ export default function CityMap({ city, places, activeId, hoverId, onSelect }: P
       mapped.forEach((p) => {
         const el = document.createElement("button");
         el.type = "button";
-        el.className = "place-pin";
-        el.style.setProperty("--pin", `var(${PIN_TOKEN[p.category]})`);
-        el.setAttribute("aria-label", p.name);
+        const stay = p.category === "sleep";
+        if (stay) {
+          // MapLibre positions the button with an inline transform, so the pill inside does the scaling.
+          el.className = "stay-pin";
+          el.appendChild(document.createElement("span")).className = "stay-pin-pill";
+          fillStayPin(el, p.name, labelsRef.current[p.id]);
+        } else {
+          el.className = "place-pin";
+          el.style.setProperty("--pin", `var(${PIN_TOKEN[p.category]})`);
+          el.setAttribute("aria-label", p.name);
+        }
         el.title = p.name;
         el.addEventListener("click", (e) => { e.stopPropagation(); onSelectRef.current(p.id); });
-        markers.current.set(p.id, new ml.Marker({ element: el, anchor: "bottom" }).setLngLat([p.lon!, p.lat!]).addTo(map));
+        markers.current.set(p.id, new ml.Marker({ element: el, anchor: stay ? "center" : "bottom" }).setLngLat([p.lon!, p.lat!]).addTo(map));
       });
       if (mapped.length > 1) {
         const lons = mapped.map((p) => p.lon!), lats = mapped.map((p) => p.lat!);

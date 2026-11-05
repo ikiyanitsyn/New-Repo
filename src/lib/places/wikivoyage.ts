@@ -22,7 +22,11 @@ const cache = new Map<string, { at: number; value: PlacesResult }>();
 /** Wikivoyage article titles, where they differ from the city name. */
 const TITLES: Record<string, string> = {};
 
-export const articleTitle = (cityCode: string) => TITLES[cityCode] ?? getCity(cityCode).name;
+export const articleTitle = (cityCode: string) => {
+  const city = getCity(cityCode);
+  // `wikivoyageTitle` is being added to City separately; read it defensively.
+  return TITLES[cityCode] ?? (city as { wikivoyageTitle?: string }).wikivoyageTitle ?? city.name;
+};
 export const articleUrl = (title: string) => `${BASE}/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
 
 async function raw(title: string, depth = 0): Promise<{ title: string; text: string }> {
