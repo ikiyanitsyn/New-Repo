@@ -6,6 +6,8 @@ import { useEffect, useMemo, useReducer, useState, useSyncExternalStore } from "
 import { getCity } from "@/lib/cities";
 import { isTrip, sampleTrip, stopsWithDates, tripLegs, type Trip } from "@/lib/trip";
 import { tripReducer } from "@/lib/tripReducer";
+import type { Comfort } from "@/lib/places/types";
+import { PrintButton } from "./print/PrintButton";
 import { CityExplorer } from "./CityExplorer";
 import { Concierge } from "./Concierge";
 import { PlusIcon, SparkIcon } from "./icons";
@@ -35,6 +37,13 @@ const subscribeHash = (cb: () => void) => {
   return () => window.removeEventListener("hashchange", cb);
 };
 const readHash = () => window.location.hash;
+function safeDecode(s: string): string | undefined {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return undefined;
+  }
+}
 function replaceHash(hash: string) {
   history.replaceState(null, "", window.location.pathname + window.location.search + hash);
   window.dispatchEvent(new HashChangeEvent("hashchange"));
@@ -71,7 +80,11 @@ export function Planner() {
   const globeStops = useMemo(() => datedStops.map((s, i) => ({ id: s.id, city: s.cityInfo, label: String(i + 1) })), [datedStops]);
 
   const hash = useSyncExternalStore(subscribeHash, readHash, () => "");
-  const hashStop = hash.startsWith("#explore-") ? hash.slice("#explore-".length) : null;
+  // "#explore-<stop>" opens a city guide; "#explore-<stop>~<place name>" also opens that place's page.
+  const exploreTarget = hash.startsWith("#explore-") ? hash.slice("#explore-".length) : null;
+  const hashStop = exploreTarget ? exploreTarget.split("~")[0] : null;
+  const hashPlace = exploreTarget && exploreTarget.includes("~") ? safeDecode(exploreTarget.slice(exploreTarget.indexOf("~") + 1)) : undefined;
+  const comfortPref = trip.plan?.preferences.find((p): p is Comfort => p === "Good value" || p === "Comfortable" || p === "Luxury");
   const exploreStopId = datedStops.some((s) => s.id === hashStop) ? hashStop : null;
   const conciergeOpen = hash === "#concierge";
   // The opening page: #start, or a first visit with nothing else asked for.
@@ -84,6 +97,10 @@ export function Planner() {
     if (stop) replaceHash(`#explore-${stop.id}`);
   };
   const moveExplorer = (stopId: string) => replaceHash(`#explore-${stopId}`);
+  const openPlaceFromPlan = (cityCode: string, placeName: string) => {
+    const stop = datedStops.find((s) => s.city === cityCode);
+    if (stop) replaceHash(`#explore-${stop.id}~${encodeURIComponent(placeName)}`);
+  };
   const closeExplorer = () => replaceHash("");
 
   return (
@@ -106,6 +123,7 @@ export function Planner() {
           <button type="button" className="btn btn-ghost hidden !text-[12.5px] md:inline-flex" onClick={() => { dispatch({ type: "reset" }); setSelectedLegId("outbound"); }}>
             Reset to example
           </button>
+          <PrintButton className="btn btn-ghost hidden md:inline-flex" label="Itinerary" />
           <ThemeToggle />
         </nav>
       </header>
@@ -133,9 +151,11 @@ export function Planner() {
             onToggleSave={(place) => dispatch({ type: "toggleSave", city: datedStops.find((s) => s.id === exploreStopId)!.city, place })}
             onNavigate={moveExplorer}
             onClose={closeExplorer}
+            comfort={comfortPref}
+            initialPlaceName={hashPlace}
           />
         )}
-        {conciergeOpen && <Concierge trip={trip} dispatch={dispatch} onClose={closeExplorer} onOpenCity={openCityFromPlan} />}
+        {conciergeOpen && <Concierge trip={trip} dispatch={dispatch} onClose={closeExplorer} onOpenCity={openCityFromPlan} onOpenPlace={openPlaceFromPlan} />}
       </main>
       )}
     </div>
