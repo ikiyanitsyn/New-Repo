@@ -1,11 +1,13 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { findCity } from "@/lib/cities";
+import { findCity, flightCodeOf, getCity } from "@/lib/cities";
 import { searchFlights } from "@/lib/flights/search";
 
+// `from` and `to` are catalog city codes (some are internal, e.g. Kyoto "UKY");
+// the flight providers translate them to the IATA code that serves the city.
 const Query = z.object({
-  from: z.string().length(3).refine((c) => findCity(c), "Unknown origin city"),
-  to: z.string().length(3).refine((c) => findCity(c), "Unknown destination city"),
+  from: z.string().length(3).refine((c) => Boolean(findCity(c)), "Unknown origin city"),
+  to: z.string().length(3).refine((c) => Boolean(findCity(c)), "Unknown destination city"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
   adults: z.coerce.number().int().min(1).max(9).default(1),
   cabin: z.enum(["economy", "premium", "business", "first"]).default("economy"),
@@ -20,6 +22,14 @@ export async function GET(request: NextRequest) {
   }
   const { from, to, date, adults, cabin, direct, mode } = parsed.data;
   if (from === to) return Response.json({ error: "Origin and destination are the same city." }, { status: 400 });
+  const a = getCity(from);
+  const b = getCity(to);
+  if (flightCodeOf(a) === flightCodeOf(b)) {
+    return Response.json(
+      { error: `${a.name} and ${b.name} share the same airports, so there is no flight between them. The train is the easy way.` },
+      { status: 400 },
+    );
+  }
 
   const result = await searchFlights({ from, to, date, adults, cabin, directOnly: direct === "1" }, mode);
   return Response.json(result, { headers: { "Cache-Control": "private, max-age=300" } });

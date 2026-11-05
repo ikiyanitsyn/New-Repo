@@ -1,4 +1,4 @@
-import { getCity, type City } from "../cities";
+import { flightCodeOf, getCity, type City } from "../cities";
 import { distanceKm } from "../geo";
 import type { Cabin, FlightOffer, FlightQuery } from "./types";
 
@@ -49,7 +49,13 @@ const CARRIERS: Carrier[] = [
   C("Air France", "CDG", "PAR", ["Europe", "North America", "East Asia"]),
   C("KLM", "AMS", "AMS", ["Europe", "North America", "East Asia"]),
   C("ITA Airways", "FCO", "ROM", ["Europe", "North America"]),
-  C("Iberia", "MAD", null, ["Europe", "North America"]),
+  C("Iberia", "MAD", "MAD", ["Europe", "North America"]),
+  C("Lufthansa", "MUC", "MUC", ["Europe", "North America", "East Asia"]),
+  C("SWISS", "ZRH", "ZRH", ["Europe", "North America"]),
+  C("Emirates", "DXB", "DXB", ["Middle East", "Europe", "East Asia", "Southeast Asia", "North America"]),
+  C("EVA Air", "TPE", "TPE", ["East Asia", "Southeast Asia", "North America"]),
+  C("Vietnam Airlines", "HAN", "HAN", ["Southeast Asia", "East Asia"]),
+  C("Malaysia Airlines", "KUL", "KUL", ["Southeast Asia", "East Asia"]),
 ];
 
 function addMinutes(isoLocal: string, min: number): string {
@@ -72,7 +78,7 @@ export function sampleOffers(q: FlightQuery): FlightOffer[] {
   for (let i = 0; i < count; i++) {
     const carrier = pool[Math.floor(rand() * pool.length)];
     // Direct flights only when the carrier is based at one end (keeps it plausible).
-    const basedAtEnd = carrier.hubCity && (carrier.hubCity.code === from.code || carrier.hubCity.code === to.code);
+    const basedAtEnd = carrier.hubCity && (carrier.hubCity.code === flightCodeOf(from) || carrier.hubCity.code === flightCodeOf(to));
     const stops = basedAtEnd && rand() < 0.75 ? 0 : rand() < 0.8 ? 1 : 2;
 
     let durationMin: number;

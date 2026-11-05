@@ -1,9 +1,13 @@
-import { getCity } from "../cities";
+import { flightCodeOf, getCity } from "../cities";
 import type { FlightQuery } from "./types";
 
 const CABIN_SKYSCANNER = { economy: "economy", premium: "premiumeconomy", business: "business", first: "first" } as const;
 
-/** Deep links to big search sites so travellers can verify and book. */
+/**
+ * Deep links to big search sites so travellers can verify and book.
+ * Uses `flightCodeOf` so cities without an airport (Kyoto, Suzhou…) search
+ * the airport or metro code that serves them.
+ */
 export function searchLinks(q: FlightQuery): { label: string; url: string }[] {
   const from = getCity(q.from);
   const to = getCity(q.to);
@@ -14,7 +18,7 @@ export function searchLinks(q: FlightQuery): { label: string; url: string }[] {
     { label: "Google Flights", url: `https://www.google.com/travel/flights?q=${encodeURIComponent(gf)}` },
     {
       label: "Skyscanner",
-      url: `https://www.skyscanner.com/transport/flights/${q.from.toLowerCase()}/${q.to.toLowerCase()}/${yymmdd}/?adultsv2=${q.adults}&cabinclass=${CABIN_SKYSCANNER[q.cabin]}${q.directOnly ? "&preferdirects=true" : ""}`,
+      url: `https://www.skyscanner.com/transport/flights/${flightCodeOf(from).toLowerCase()}/${flightCodeOf(to).toLowerCase()}/${yymmdd}/?adultsv2=${q.adults}&cabinclass=${CABIN_SKYSCANNER[q.cabin]}${q.directOnly ? "&preferdirects=true" : ""}`,
     },
     { label: "Kiwi.com", url: "https://www.kiwi.com/en/" },
   ];
