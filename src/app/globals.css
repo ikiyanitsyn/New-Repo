@@ -764,3 +764,9 @@ a.provider-credit { text-decoration: underline; text-underline-offset: 2px; }
   .day-card { flex-direction: column; gap: 8px; }
   .day-date { flex-direction: row; gap: 10px; width: auto; }
 }
+
+/* Very narrow phones: the short name keeps the top bar on one line. */
+@media (max-width: 420px) {
+  .wordmark-first { display: none; }
+  .wordmark { font-size: 20px; }
+}

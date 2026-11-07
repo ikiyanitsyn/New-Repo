@@ -81,7 +81,13 @@
 - Globe: polar band, rings and stacked arcs fixed; split-flap departure-board route codes.
 - Design analysis in docs/DESIGN.md and a Hopper-style opening page with Where · Dates · Guests.
 
-### Phase 4: accounts, saving and sharing (schema ready: supabase/schema.sql; waiting on the owner's Supabase keys)
+### Phase 4: accounts, saving and sharing ✅ ready for review
+- Sign in with a one-time email link (no password). Account menu with a live save status (Saved / Saving… / Offline · kept on this device / View only).
+- My trips: every saved trip, on any device; open, delete; "Save this trip to my trips". Starting a new trip never overwrites a saved one.
+- Share: a view-only link (/share#…, no account needed, can print or make a copy) that can be turned off; invite by email to edit or view.
+- Shared trips: invitations become shared trips when that person signs in; edits sync live between everyone on the trip (last save wins if two people save the same moment, with a note).
+- Offline: installable app (manifest and icons); a service worker keeps pages, app code, map shapes and visited city guides; trips are kept on the device and edits made offline are sent when you're back online.
+- `npm run check:supabase` checks the project, tables, security rules and functions from your own computer.
 - Sign-in, My trips, view-only share links, Shared trips with live editing together.
 - Flight cache and live-search counter move to the database.
 - Installable app with offline access to saved trips.

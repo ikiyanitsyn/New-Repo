@@ -164,6 +164,22 @@ end $$;
 revoke all on function public.accept_my_invites() from public;
 grant execute on function public.accept_my_invites() to authenticated;
 
+-- Owner removes someone: deletes their invitation and, if they already joined, their access.
+create or replace function public.remove_trip_person(t uuid, person_email text)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (select 1 from trips where id = t and owner_id = auth.uid()) then
+    raise exception 'Only the trip owner can remove people';
+  end if;
+  delete from trip_members m
+    using auth.users u
+    where m.trip_id = t and m.user_id = u.id and lower(u.email) = lower(person_email);
+  delete from trip_invites where trip_id = t and lower(email) = lower(person_email);
+end $$;
+revoke all on function public.remove_trip_person(uuid, text) from public;
+grant execute on function public.remove_trip_person(uuid, text) to authenticated;
+
 -- ---------------------------------------------------------------- live editing together
 -- Lets everyone on a shared trip see edits as they happen.
 do $$

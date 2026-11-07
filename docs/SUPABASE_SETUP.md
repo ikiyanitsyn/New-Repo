@@ -45,7 +45,10 @@ Everything here is on the **free plan**. No card is needed.
    ```
 
    `NEXT_PUBLIC_` means the value may be used in the browser, which is fine for these two. Restart the app after saving (Ctrl+C, then `npm run dev`).
-6. **Tell your main Intercontinental Nomad chat "Supabase is set up".** The accounts and sharing features will then be switched on and tested.
+6. **Check it.** In VS Code's terminal, in the project folder, run `npm run check:supabase`. Every line should start with ✓. It only reads; it changes nothing.
+7. **Try it.** Run `npm run dev`, press **Sign in** (top right), enter your email, open the link from the email on the same computer, then use the account menu: **Save this trip to my trips**, **My trips**, **Share this trip**.
+
+> **Updating later:** when the project gains new database features, run the latest `supabase/schema.sql` again in the SQL Editor. It's safe to run any number of times.
 
 ---
 

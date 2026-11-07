@@ -6,8 +6,11 @@ import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
+import { ServiceWorker } from "@/components/ServiceWorker";
 
 export const metadata: Metadata = {
+  appleWebApp: { capable: true, title: "Nomad", statusBarStyle: "black-translucent" },
+  icons: { apple: "/apple-touch-icon.png" },
   title: "Intercontinental Nomad",
   description: "Plan multi-city trips: flights in and out, trains and transfers between, and everything to see and do in one itinerary.",
 };
@@ -31,7 +34,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <ServiceWorker />
+      </body>
     </html>
   );
 }

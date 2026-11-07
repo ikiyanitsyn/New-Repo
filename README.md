@@ -2,7 +2,7 @@
 
 Plan multi-city trips on one screen: fly into one city and home from another, add stops and how you'll travel between them, and compare fares by cheapest, fastest or the best balance of both, all on an interactive globe.
 
-**Status:** Phase 3 of 5. See [docs/ROADMAP.md](docs/ROADMAP.md).
+**Status:** Phase 4 of 5. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Quick start
 
@@ -24,6 +24,7 @@ Open <http://localhost:3000>. Without API keys the app shows clearly labelled sa
 | `npm run build` / `npm start` | Production build and server |
 | `npm test` | Unit tests (ranking, trip dates, rail estimates) |
 | `npm run lint` / `npm run typecheck` | Code checks |
+| `npm run check:supabase` | Checks your Supabase project is set up (reads only) |
 
 ## How it's organised
 
