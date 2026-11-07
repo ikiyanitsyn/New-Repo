@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { normalizeSupabaseUrl } from "./url";
 
 /**
  * The browser's connection to Supabase (accounts, saved and shared trips).
@@ -8,7 +9,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * the database's row-level security rules permit (see supabase/schema.sql).
  * Without them the app works exactly as before, saving on this device only.
  */
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+// Tolerates a URL copied with extra parts, e.g. ".../rest/v1/".
+const URL = normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL).url ?? undefined;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const cloudConfigured = Boolean(URL && KEY);

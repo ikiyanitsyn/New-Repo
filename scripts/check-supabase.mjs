@@ -18,8 +18,26 @@ function env() {
 }
 
 const e = env();
-const url = e.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
-const key = e.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const rawUrl = (e.NEXT_PUBLIC_SUPABASE_URL ?? "").trim().replace(/^["']|["']$/g, "");
+const key = (e.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim().replace(/^["']|["']$/g, "");
+
+// Same tidying the app does (src/lib/cloud/url.ts).
+let url = null;
+const dash = /supabase\.com\/dashboard\/project\/([a-z0-9]+)/i.exec(rawUrl);
+if (dash) {
+  console.log("✗ NEXT_PUBLIC_SUPABASE_URL is the dashboard page address, not the Project URL.");
+  console.log(`  Change it to: https://${dash[1]}.supabase.co`);
+  process.exit(1);
+}
+try {
+  const u = new URL(/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`);
+  url = `${u.protocol}//${u.host}`;
+  if (u.pathname !== "/" && u.pathname !== "") console.log(`• Your URL has extra parts ("${u.pathname}"). The app ignores them, but you can tidy it to: ${url}`);
+} catch {}
+console.log(`• Checking ${url ?? "(no valid URL)"}\n`);
+if (url && !/\.supabase\.co$/i.test(new URL(url).host)) {
+  console.log("• Note: Supabase Project URLs normally end in .supabase.co. Copy it from Project Settings → Data API (or API).\n");
+}
 if (!url || !key) {
   console.log("✗ NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must both be set in .env.local.");
   process.exit(1);
@@ -40,12 +58,24 @@ const check = async (label, fn) => {
   }
 };
 
+let reachable = true;
 await check("Supabase project is reachable", async () => {
-  const r = await fetch(`${url}/auth/v1/settings`, { headers });
-  if (!r.ok) throw new Error(`answered ${r.status}. Check the Project URL and key.`);
+  let r;
+  try {
+    r = await fetch(`${url}/auth/v1/settings`, { headers });
+  } catch {
+    reachable = false;
+    throw new Error("no answer. Check the Project URL, your internet connection, and that the project isn't paused (Supabase dashboard → Restore).");
+  }
+  if (r.status === 401 || r.status === 403) { reachable = false; throw new Error("the key was refused. Copy the publishable (or anon public) key again into NEXT_PUBLIC_SUPABASE_ANON_KEY."); }
+  if (!r.ok) { reachable = false; throw new Error(`answered ${r.status}, so this isn't a Supabase project address. In Supabase open Project Settings → Data API (or API) and copy the Project URL, which looks like https://abcdefgh.supabase.co`); }
   const s = await r.json();
   return s.external?.email ? "email sign-in is on" : "warning: email sign-in looks switched off";
 });
+if (!reachable) {
+  console.log("\nFix the line above first; the database checks need the right address and key.");
+  process.exit(1);
+}
 for (const table of ["trips", "trip_members", "trip_invites", "share_links"]) {
   await check(`Table "${table}" exists and is protected`, async () => {
     const r = await fetch(`${url}/rest/v1/${table}?select=*&limit=1`, { headers });

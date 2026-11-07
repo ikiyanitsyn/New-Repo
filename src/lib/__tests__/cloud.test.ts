@@ -51,3 +51,21 @@ describe("trip summaries", () => {
     expect(friendlyError({ message: "new row violates row-level security policy" })).toMatch(/permission/);
   });
 });
+
+import { normalizeSupabaseUrl } from "../cloud/url";
+
+describe("Supabase URL tidying", () => {
+  it("keeps a correct Project URL", () => {
+    expect(normalizeSupabaseUrl("https://abcdefgh.supabase.co").url).toBe("https://abcdefgh.supabase.co");
+  });
+  it("drops extra parts and quotes", () => {
+    expect(normalizeSupabaseUrl(' "https://abcdefgh.supabase.co/rest/v1/" ').url).toBe("https://abcdefgh.supabase.co");
+    expect(normalizeSupabaseUrl("abcdefgh.supabase.co/").url).toBe("https://abcdefgh.supabase.co");
+  });
+  it("recognises the dashboard address", () => {
+    expect(normalizeSupabaseUrl("https://supabase.com/dashboard/project/abcdefgh/settings/api")).toEqual({ url: "https://abcdefgh.supabase.co", problem: "dashboard" });
+  });
+  it("reports a missing value", () => {
+    expect(normalizeSupabaseUrl(undefined).problem).toBe("missing");
+  });
+});
