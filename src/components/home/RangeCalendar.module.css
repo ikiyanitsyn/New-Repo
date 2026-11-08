@@ -1,0 +1,191 @@
+/*
+ * Range calendar. A popover under the composer on desktop (two months),
+ * a full-screen sheet on phones (one month). Theme tokens only.
+ */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: transparent;
+}
+
+.calendar {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  z-index: 41;
+  width: min(720px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  padding: 18px 22px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-solid);
+  color: var(--ink);
+  box-shadow: var(--shadow-lg);
+  text-align: left;
+  animation: cal-in 0.18s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes cal-in { from { opacity: 0; transform: translate(-50%, -4px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.title {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.close { display: none; }
+
+.nav {
+  position: relative;
+  height: 0;
+}
+.navBtn {
+  position: absolute;
+  top: 8px;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--ink-2);
+}
+.navBtn:first-child { left: -6px; }
+.navBtn:last-child { right: -6px; }
+
+.months {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin-top: 6px;
+}
+
+.monthTitle {
+  height: 48px;
+  display: grid;
+  place-items: center;
+  font-size: 19px;
+}
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.grid th {
+  height: 28px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.cell, .blank {
+  height: 42px;
+  padding: 1px 0;
+  text-align: center;
+}
+
+.day {
+  position: relative;
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-data);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.day:hover:not(:disabled) { border-color: var(--ink-3); }
+.day:disabled { color: var(--ink-3); opacity: 0.45; cursor: default; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--ink-3) 50%, transparent); }
+.day[aria-current="date"] { font-weight: 700; }
+.day[aria-current="date"]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* The band behind a range: brass tint, rounded at the ends. */
+.cell[data-state="inside"] { background: var(--accent-soft); }
+.cell[data-state="start"] { background: linear-gradient(90deg, transparent 50%, var(--accent-soft) 50%); }
+.cell[data-state="end"] { background: linear-gradient(90deg, var(--accent-soft) 50%, transparent 50%); }
+.cell[data-state="start"] .day,
+.cell[data-state="end"] .day,
+.cell[data-state="single"] .day {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.cell[data-state="start"] .day::after,
+.cell[data-state="end"] .day::after,
+.cell[data-state="single"] .day::after { background: var(--on-accent); }
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13.5px;
+  min-width: 0;
+}
+.note { font-size: 12px; color: var(--ink-3); }
+.actions { display: flex; gap: 8px; margin-left: auto; }
+
+/* Phones: a full-screen sheet with one month and thumb-sized days. */
+@media (max-width: 600px) {
+  .scrim { background: rgb(10 15 22 / 0.4); }
+  .calendar {
+    position: fixed;
+    inset: 0;
+    top: 0;
+    left: 0;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    transform: none;
+    display: flex;
+    flex-direction: column;
+    padding: max(14px, env(safe-area-inset-top, 0px)) 16px max(14px, env(safe-area-inset-bottom, 0px));
+    border-radius: 0;
+    border: 0;
+    overflow-y: auto;
+    animation: sheet-in 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  @keyframes sheet-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  .title { font-size: 12px; }
+  .close { display: inline-flex; width: 44px; height: 44px; }
+  .months { grid-template-columns: 1fr; gap: 0; }
+  .month[data-second] { display: none; }
+  .navBtn { top: 4px; width: 44px; height: 44px; }
+  .navBtn:first-child { left: 0; }
+  .navBtn:last-child { right: 0; }
+  .day { width: 44px; height: 44px; font-size: 15px; }
+  .cell, .blank { height: 48px; }
+  .foot { margin-top: auto; }
+  .actions :global(.btn) { min-height: 44px; }
+  .actions :global(.btn-primary) { min-width: 120px; }
+}

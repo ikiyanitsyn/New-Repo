@@ -1,18 +1,28 @@
 /*
- * Opening page. Photo-led like Hopper; ink, brass and Bodoni from our own
+ * Home page. Photo-led like Hopper; ink, brass and Bodoni from our own
  * tokens. Text on the photo uses the fixed --porcelain / --brass-light tokens
  * because the scrim is dark in both themes; the composer card follows the theme.
  */
 
+/* The whole home scrolls inside the app frame on desktop; on phones the page scrolls. */
+.home {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
 .landing {
   position: relative;
   isolation: isolate;
+  z-index: 2; /* keeps the calendar and menus above the sections below */
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   place-items: center;
-  min-height: 100%;
-  padding: 56px max(16px, env(safe-area-inset-right, 0px)) 72px max(16px, env(safe-area-inset-left, 0px));
-  overflow: hidden;
+  min-height: min(100%, 860px);
+  padding: 56px max(16px, env(safe-area-inset-right, 0px)) 56px max(16px, env(safe-area-inset-left, 0px));
   color: var(--porcelain);
   animation: landing-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
@@ -23,6 +33,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
+  overflow: hidden;
   background:
     radial-gradient(110% 80% at 78% 8%, color-mix(in srgb, var(--brass-light) 40%, transparent), transparent 62%),
     radial-gradient(90% 70% at 8% 100%, color-mix(in srgb, var(--ground) 34%, transparent), transparent 64%),
@@ -35,7 +46,7 @@
   z-index: 1;
   background:
     radial-gradient(52% 34% at 50% 40%, rgb(10 15 22 / 0.4), transparent 100%),
-    linear-gradient(180deg, rgb(10 15 22 / 0.5) 0%, rgb(10 15 22 / 0.2) 34%, rgb(10 15 22 / 0.32) 62%, rgb(10 15 22 / 0.72) 100%);
+    linear-gradient(180deg, rgb(10 15 22 / 0.5) 0%, rgb(10 15 22 / 0.2) 34%, rgb(10 15 22 / 0.32) 62%, rgb(10 15 22 / 0.78) 100%);
 }
 
 .photo {
@@ -57,7 +68,6 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
-  /* Fade the arc (and plane) out behind the headline and composer so it never crosses text. */
   -webkit-mask-image: radial-gradient(46% 36% at 50% 46%, transparent 62%, #000 100%);
   mask-image: radial-gradient(46% 36% at 50% 46%, transparent 62%, #000 100%);
 }
@@ -76,8 +86,8 @@
 
 .content {
   position: relative;
-  z-index: 3;
-  width: min(100%, 1000px);
+  z-index: 4; /* above the photo credit, so sheets opened from the composer cover it */
+  width: min(100%, 1120px);
   text-align: center;
 }
 
@@ -90,34 +100,54 @@
 }
 .title {
   margin-top: 14px;
-  font-size: clamp(46px, 7.4vw, 92px);
+  font-size: clamp(44px, 7vw, 88px);
   font-weight: 500;
   line-height: 0.98;
   text-shadow: 0 2px 28px rgb(10 15 22 / 0.3);
 }
 .title em { font-style: italic; color: var(--brass-light); }
-.lede {
-  max-width: 34em;
-  margin: 18px auto 0;
-  font-size: 16.5px;
-  line-height: 1.5;
-  opacity: 0.94;
-  text-wrap: pretty;
-  text-shadow: 0 1px 12px rgb(10 15 22 / 0.7);
-}
 
-/* Where · Dates · Guests */
+/* ---------- The composer ---------- */
 .composer {
-  display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.35fr) minmax(0, 1.1fr) auto;
-  margin-top: 36px;
-  padding: 8px;
+  position: relative;
+  margin-top: 34px;
+  padding: 6px 8px 8px;
   border-radius: var(--radius-lg);
   background: var(--surface-solid);
   color: var(--ink);
   box-shadow: var(--shadow-lg);
   text-align: left;
 }
+
+.types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px 8px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.type {
+  height: 34px;
+  padding-inline: 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.type:hover { background: var(--surface-sunk); color: var(--ink); }
+.type[aria-checked="true"] { background: var(--accent-soft); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+
+.fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  margin-top: 6px;
+}
+.composer[data-type="stopover"] .fields { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1fr) auto; }
+.composer[data-type="multi"] .fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr) auto; }
 
 .part {
   position: relative;
@@ -139,8 +169,7 @@
   width: 1px;
   background: var(--line);
 }
-.part:hover { background: var(--surface-sunk); }
-.part:focus-within { background: var(--surface-sunk); }
+.part:hover, .part:focus-within { background: var(--surface-sunk); }
 .part:has(:focus-visible) { box-shadow: inset 0 0 0 2px var(--accent); }
 .part:focus-within::before,
 .part:hover::before,
@@ -156,69 +185,59 @@
   color: var(--ink-3);
 }
 
-.where :global(.field) {
+.city :global(.field) {
   height: 32px;
   padding: 0;
   border: 0;
   background: transparent;
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 18px;
+  text-overflow: ellipsis;
 }
-.where :global(.field)::placeholder { color: var(--ink-3); font-family: var(--font-body); font-size: 15px; }
+.city :global(.field)::placeholder { color: var(--ink-3); font-family: var(--font-body); font-size: 14.5px; }
 /* CityPicker shows the chosen city as its placeholder; make it read as a value. */
-.where[data-filled] :global(.field)::placeholder { color: var(--ink); font-family: var(--font-display); font-size: 19px; }
-.where :global(.field):focus-visible { outline: none; }
-.where :global([role="listbox"]) { top: 40px; min-width: 280px; text-align: left; }
+.city[data-filled] :global(.field)::placeholder { color: var(--ink); font-family: var(--font-display); font-size: 18px; }
+.city :global(.field):focus-visible { outline: none; }
+.city :global([role="listbox"]) { top: 40px; min-width: 280px; text-align: left; }
 
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-}
-
-.date {
-  height: 32px;
+.fieldButton {
+  display: block;
+  width: 100%;
+  min-height: 32px;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--ink);
-  font-family: var(--font-data);
-  font-size: 14px;
-}
-.date:focus-visible { outline: none; }
-
-.hint { font-size: 12px; color: var(--ink-3); }
-
-.stepper {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13.5px;
+  font-size: 15px;
+  text-align: left;
   white-space: nowrap;
-}
-.stepper button {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 1px solid var(--line-strong);
-  color: var(--ink-2);
-  background: var(--surface-solid);
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
 }
-.stepper button:hover:not(:disabled) { border-color: var(--ink-3); color: var(--ink); }
-.stepper button:disabled { opacity: 0.4; cursor: default; }
-.unit { color: var(--ink-3); font-family: var(--font-body); }
+.fieldButton:focus-visible { outline: none; }
+.dates .fieldButton { font-size: 14.5px; }
+
+.hint { font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .go {
   height: auto;
   min-height: 58px;
   margin-left: 8px;
-  padding-inline: 24px;
+  padding-inline: 22px;
   border-radius: calc(var(--radius-lg) - 4px);
   font-size: 15px;
+  align-self: center;
+}
+
+.multiWrap {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 12px 16px 6px;
+  border-top: 1px solid var(--line);
 }
 
 .error {
@@ -228,58 +247,24 @@
   text-shadow: 0 1px 8px rgb(10 15 22 / 0.6);
 }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 4px;
-}
-.action {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 10px 18px;
-  border-radius: calc(var(--radius-lg) - 4px);
-  border: 1px solid rgb(252 252 250 / 0.24);
-  background: rgb(10 15 22 / 0.38);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+.describe {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
   color: var(--porcelain);
   font-size: 14px;
-  font-weight: 550;
-  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: rgb(252 252 250 / 0.4);
+  text-underline-offset: 4px;
+  text-shadow: 0 1px 10px rgb(10 15 22 / 0.7);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
 }
-.action:hover { background: rgb(10 15 22 / 0.55); border-color: rgb(252 252 250 / 0.4); }
-.action > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
-.actionMeta { font-size: 12px; font-weight: 400; opacity: 0.76; }
+.describe:hover { text-decoration-color: var(--brass-light); }
 .spark { color: var(--brass-light); }
-
-.from {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: baseline;
-  gap: 4px 8px;
-  margin-top: 20px;
-  font-size: 13px;
-  text-shadow: 0 1px 8px rgb(10 15 22 / 0.6);
-}
-.from label { opacity: 0.8; }
-.from select {
-  padding: 0 2px 1px;
-  border: 0;
-  border-bottom: 1px dotted rgb(252 252 250 / 0.6);
-  background: transparent;
-  color: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-.from option { color: var(--ink); background: var(--surface-solid); }
-.note { flex-basis: 100%; opacity: 0.72; font-size: 12px; }
 
 .credit {
   position: absolute;
@@ -293,25 +278,43 @@
 }
 .credit a { color: inherit; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: rgb(252 252 250 / 0.4); }
 
-@media (max-width: 1024px) {
-  .composer { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .where { grid-column: 1 / -1; }
+.below {
+  position: relative;
+  z-index: 1;
+  width: min(100% - 32px, 1120px);
+  margin: 0 auto;
+  padding: 40px 0 72px;
+}
+
+@media (max-width: 1100px) {
+  .fields,
+  .composer[data-type="stopover"] .fields,
+  .composer[data-type="multi"] .fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .part + .part::before { display: none; }
-  .where { border-bottom: 1px solid var(--line); border-radius: calc(var(--radius-lg) - 6px) calc(var(--radius-lg) - 6px) 0 0; }
-  .guests { border-left: 1px solid var(--line); border-radius: 0; }
-  .go { grid-column: 1 / -1; margin: 8px 0 0; min-height: 50px; }
+  .part { border-bottom: 1px solid var(--line); border-radius: 0; }
+  .go { grid-column: 1 / -1; order: 10; margin: 8px 0 0; min-height: 50px; width: 100%; }
+  .composer[data-type="stopover"] .fields > .part:nth-child(2) { grid-column: span 1; }
 }
 
 @media (max-width: 860px) {
-  /* The app frame scrolls as a page on phones, so size the hero to the screen. */
-  .landing { min-height: calc(100svh - 61px); padding-top: 40px; padding-bottom: 64px; }
-  .lede { font-size: 15.5px; }
+  /* The app frame scrolls as a page on phones. */
+  .home { height: auto; overflow: visible; }
+  .landing { min-height: calc(100svh - 61px); padding-top: 32px; padding-bottom: 48px; }
 }
 
 @media (max-width: 600px) {
-  .composer { grid-template-columns: minmax(0, 1fr); margin-top: 28px; }
-  .dates { border-bottom: 1px solid var(--line); border-radius: 0; }
-  .guests { border-left: 0; }
-  .action { width: 100%; }
+  /* While a full-screen sheet (calendar, travellers) is open, lift the hero above the top bar. */
+  .landing:has([role="dialog"]) { z-index: 30; }
+  .title { font-size: 44px; }
+  .composer { margin-top: 24px; padding: 4px 4px 6px; }
+  .types { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 6px 4px 8px; }
+  .type { height: 40px; padding-inline: 8px; }
+  .fields,
+  .composer[data-type="stopover"] .fields,
+  .composer[data-type="multi"] .fields { grid-template-columns: minmax(0, 1fr); }
+  .part { padding: 10px 12px; min-height: 60px; }
+  .multiWrap { padding: 10px 12px 4px; }
+  .go { min-height: 52px; }
   .credit { left: 16px; text-align: center; }
+  .below { padding-top: 28px; }
 }
