@@ -10,10 +10,10 @@ import s from "./StyleBoard.module.css";
 
 const SWATCH_KEYS = ["--bg", "--ink", "--accent", "--ground", "--surface-sunk"];
 const PHOTO_CITIES = [
-  { code: "BJS", name: "Beijing" },
-  { code: "SHA", name: "Shanghai" },
-  { code: "UKY", name: "Kyoto" },
-  { code: "PAR", name: "Paris" },
+  { code: "JTR", name: "Santorini" },
+  { code: "NCE", name: "Nice" },
+  { code: "LIS", name: "Lisbon" },
+  { code: "HKT", name: "Phuket" },
 ];
 
 /** City banners from the free travel guide (Wikivoyage / Wikimedia Commons), for the photo previews. */
@@ -22,9 +22,9 @@ function useBanners() {
   useEffect(() => {
     let alive = true;
     PHOTO_CITIES.forEach((c) =>
-      fetch(`/api/places?city=${c.code}`)
+      fetch(`/api/places/banner?city=${c.code}&w=1200`)
         .then((r) => r.json())
-        .then((j) => { if (alive && j.banner) setBanners((b) => ({ ...b, [c.code]: j.banner })); })
+        .then((j) => { const u = j.hero ?? j.url; if (alive && u) setBanners((b) => ({ ...b, [c.code]: u })); })
         .catch(() => {}),
     );
     return () => { alive = false; };
@@ -116,9 +116,9 @@ export function StyleBoard() {
           <div className="eyebrow !text-accent">Step 2 · Theme</div>
           <h1 className={s.title}>Style board</h1>
           <p className={s.lead}>
-            Warm and friendly, with colour and motion: three new palettes mixing deep green, darks, brass and light tones, beside the
-            original. Try any combination of colours and heading font. Applying one restyles the whole app at once, so you can open the
-            planner, guide and concierge and see it for real. You can switch back any time.
+            Coastal and colourful: Riviera is the new default (sea blue, turquoise, terracotta coral and lemon on whitewashed sand), with
+            two sister palettes, Lagoon and Amalfi Sunset. Rounder shapes throughout, and motion everywhere. Try any palette with any heading
+            font; applying one restyles the whole app at once.
           </p>
         </header>
 
@@ -126,7 +126,7 @@ export function StyleBoard() {
           <p className={s.choiceText}>Applied now: <strong>{pName}</strong> colours with <strong>{fName}</strong> headings.</p>
           <Link href="/" className="btn !h-9">See the home page</Link>
           <Link href="/#trip" className="btn !h-9">See the planner</Link>
-          <button type="button" className="btn btn-ghost !h-9" onClick={() => choose("classic", "bodoni", "Back to the original look")}>Reset to original</button>
+          <button type="button" className="btn btn-ghost !h-9" onClick={() => choose("classic", "bodoni", "Back to Riviera")}>Back to Riviera</button>
         </div>
 
         <section aria-labelledby="pal-h">
@@ -155,8 +155,8 @@ export function StyleBoard() {
                   </div>
                 </div>
                 <div className={s.pair}>
-                  <Mock palette={p.id} mode="light" font={chosen.font} photo={banners.BJS} />
-                  <Mock palette={p.id} mode="dark" font={chosen.font} photo={banners.BJS} />
+                  <Mock palette={p.id} mode="light" font={chosen.font} photo={banners.JTR} />
+                  <Mock palette={p.id} mode="dark" font={chosen.font} photo={banners.JTR} />
                 </div>
               </article>
             ))}
@@ -194,8 +194,8 @@ export function StyleBoard() {
           <div className={s.sectionHead}>
             <h2 id="motion-h" className={s.h2}>Motion</h2>
             <p className={s.sub}>
-              Ideas for more movement, each shown where it would live. Tell me which to roll out across the app. Everything stays still for
-              people who turn on &ldquo;reduce motion&rdquo; on their device.
+              All of these are now live across the app: on the home page, the globe, fares, the city guide, the concierge and your trips.
+              Everything stays still for people who turn on &ldquo;reduce motion&rdquo; on their device.
             </p>
             <div><button type="button" className="btn !h-9" onClick={() => setReplay((n) => n + 1)}>Replay animations</button></div>
           </div>
@@ -203,7 +203,7 @@ export function StyleBoard() {
             <article className={s.demo}>
               <div className={s.demoStage}><span><SplitFlap value="BJS" size="lg" tone="brass" /> <SplitFlap value="13:05" size="lg" /></span></div>
               <div className={s.demoTitle}>Departure-board letters</div>
-              <p className={s.demoText}>Already on route codes. Could also spell city names on the home hero and the trip summary.</p>
+              <p className={s.demoText}>On route codes, fares and the home page&apos;s &ldquo;Next stop&rdquo; board, which flips with each photo.</p>
             </article>
             <article className={s.demo}>
               <div className={s.demoStage}>
@@ -212,29 +212,29 @@ export function StyleBoard() {
                 </svg>
               </div>
               <div className={s.demoTitle}>Routes that draw themselves</div>
-              <p className={s.demoText}>Flight arcs and train lines sketch in on the globe when a trip opens or a leg is chosen.</p>
+              <p className={s.demoText}>On the globe, each leg sketches in one after another when a trip opens or changes, then the planes take off.</p>
             </article>
             <article className={s.demo}>
               <div className={s.demoStage}><PlaneLoader label="Plane crossing the sky" /></div>
               <div className={s.demoTitle}>Plane across the sky</div>
-              <p className={s.demoText}>Today on the concierge and home hero. Could also play while fares and hotel prices load.</p>
+              <p className={s.demoText}>On the home hero, while the concierge writes, and while fares and hotel prices load.</p>
             </article>
             <article className={s.demo}>
               <div className={s.demoStage}><div className={s.lift}>Hover me · Kyoto, 3 nights</div></div>
               <div className={s.demoTitle}>Cards that lift</div>
-              <p className={s.demoText}>Stay cards, trip cards and ideas rise gently under the pointer, a friendlier feel.</p>
+              <p className={s.demoText}>Ideas, deals, stopovers, stays, fares and your trips rise gently under the pointer.</p>
             </article>
             <article className={s.demo}>
               <div className={s.demoStage}><div className={s.stagger}><span /><span /><span /><span /></div></div>
               <div className={s.demoTitle}>Lists that cascade in</div>
-              <p className={s.demoText}>Fares, places and plan days appear one after another instead of all at once.</p>
+              <p className={s.demoText}>Fares, places, plan days and trip cards arrive one after another; home sections fade up as you scroll.</p>
             </article>
             <article className={s.demo}>
               <div className={s.demoStage} style={{ padding: 0 }}>
-                {banners.SHA ? <div className={s.kenburns} style={{ backgroundImage: `url("${banners.SHA}")` }} /> : <span className="text-ink-3 text-[13px]">Loading photo…</span>}
+                {banners.NCE ? <div className={s.kenburns} style={{ backgroundImage: `url("${banners.NCE}")` }} /> : <span className="text-ink-3 text-[13px]">Loading photo…</span>}
               </div>
               <div className={s.demoTitle}>Slow-moving photos</div>
-              <p className={s.demoText}>A gentle drift on city hero photos (home and city guide), like a film opening.</p>
+              <p className={s.demoText}>The home page&apos;s coastal slideshow drifts and cross-fades; city guide banners pan slowly.</p>
             </article>
           </div>
         </section>
@@ -243,8 +243,8 @@ export function StyleBoard() {
           <div className={s.sectionHead}>
             <h2 id="photo-h" className={s.h2}>A photo for every city</h2>
             <p className={s.sub}>
-              Each destination gets its own wide photo from the free travel guide (Wikivoyage, credited), on the home page when you pick a
-              city and at the top of its guide.
+              Pick a destination on the home page and the hero switches to that city&apos;s photo (curated coastal photos, or the city&apos;s
+              main Wikipedia photo). Each city guide opens with its own banner. All free and credited.
             </p>
           </div>
           <div className={s.photos}>

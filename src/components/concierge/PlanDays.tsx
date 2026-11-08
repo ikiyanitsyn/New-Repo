@@ -206,7 +206,7 @@ export function PlanDays({ resp, plan, trip, editable, onChange, onOpenCity, onO
   const savedByCity = trip.saved ?? {};
 
   return (
-    <div className={`flex flex-col gap-6 ${drag ? styles.dragActive : ""}`}>
+    <div className={`cascade flex flex-col gap-6 ${drag ? styles.dragActive : ""}`}>
       <div className="sr-only" role="status" aria-live="polite">{announce}</div>
       {editable && (
         <p className={styles.hint}>

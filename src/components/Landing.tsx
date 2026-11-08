@@ -34,6 +34,9 @@ import type { SuggestionAction } from "./home/suggestions";
 import { TravellersPicker } from "./home/TravellersPicker";
 import { TripCards } from "./home/TripCards";
 import { ArrowIcon, SparkIcon } from "./icons";
+import { SplitFlap } from "./SplitFlap";
+import { useCityBanner } from "@/lib/useCityBanner";
+import { useReveal } from "@/lib/useReveal";
 import s from "./Landing.module.css";
 
 /*
@@ -51,12 +54,24 @@ interface Photo {
   license: string;
 }
 
-const PHOTOS: Record<"default" | "SHA", Photo> = {
-  default: { file: "The_Great_Wall_of_China_at_Jinshanling.jpg", caption: "Great Wall at Jinshanling", credit: "Vincent Ndaku", license: "CC BY-SA 3.0" },
-  SHA: { file: "Pudong_Shanghai_November_2017_HDR_panorama.jpg", caption: "Pudong, Shanghai", credit: "King of Hearts", license: "CC BY-SA 4.0" },
-};
-const photoUrl = (p: Photo) => `https://commons.wikimedia.org/wiki/Special:FilePath/${p.file}?width=1920`;
-const photoPage = (p: Photo) => `https://commons.wikimedia.org/wiki/File:${p.file}`;
+interface Slide extends Photo { city: string; name: string }
+
+/**
+ * Inspiring coastal photos for the hero slideshow. Each file was checked on
+ * Wikimedia Commons (landscape, at least 3,900px wide, free licence) on 2026-11-08.
+ */
+const SLIDES: Slide[] = [
+  { city: "NAP", name: "Positano", file: "Positano_(Italy)_02.jpg", caption: "Positano, Amalfi Coast", credit: "Bernard Gagnon", license: "CC BY 4.0" },
+  { city: "JTR", name: "Santorini", file: "Oia_-_Santorini_2019.jpg", caption: "Oia, Santorini", credit: "Anna Tsolidou", license: "CC BY-SA 4.0" },
+  { city: "NCE", name: "Nice", file: "Promenade_des_Anglais_(Nice),_plage.jpg", caption: "Promenade des Anglais, Nice", credit: "Uhooep", license: "CC BY-SA 4.0" },
+  { city: "DBV", name: "Dubrovnik", file: "Dubrovnik_old_town_aerial_20261010.jpg", caption: "Dubrovnik old town", credit: "VynedJ", license: "CC BY 4.0" },
+  { city: "LIS", name: "Lisbon", file: "Lissabon_-_Alfama_-_Largo_Santa_Luzia_-_Streetcar_-_1.jpg", caption: "Alfama, Lisbon", credit: "Ingo Mehling", license: "CC BY-SA 4.0" },
+  { city: "DPS", name: "Bali", file: "Sunset,_Kuta,_Bali,_Indonesia,_20220825_1755_0879.jpg", caption: "Sunset at Kuta, Bali", credit: "Jakub Hałun", license: "CC BY-SA 4.0" },
+  { city: "HKT", name: "Phi Phi", file: "Phi_Phi_Island_Phuket_Thailand_-_panoramio_(3).jpg", caption: "Phi Phi Islands near Phuket", credit: "Michelle Maria", license: "CC BY 3.0" },
+];
+const SLIDE_MS = 7000;
+const photoUrl = (p: Photo) => `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(p.file)}?width=1920`;
+const photoPage = (p: Photo) => `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(p.file)}`;
 
 const subscribeMotion = (cb: () => void) => {
   const m = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -97,9 +112,27 @@ export function Landing({ trip, dispatch, hasSavedTrip, onPlan, onConcierge, onC
   const [tried, setTried] = useState(false);
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
 
-  const photo = search.to === "SHA" || search.cities[0]?.city === "SHA" ? PHOTOS.SHA : PHOTOS.default;
-  const loaded = usePhotoLoaded(photoUrl(photo));
   const still = useSyncExternalStore(subscribeMotion, reducedMotion, () => true);
+  useReveal([]);
+
+  // Hero: the destination you've chosen, else a slow slideshow of inspiring coastal places.
+  const chosenCity = search.tripType === "multi" ? search.cities[0]?.city : search.to;
+  const curated = chosenCity ? SLIDES.find((x) => x.city === chosenCity) : undefined;
+  const cityPhoto = useCityBanner(chosenCity && !curated ? chosenCity : null);
+  const [slide, setSlide] = useState(0);
+  useEffect(() => {
+    if (still || chosenCity) return;
+    const t = setInterval(() => setSlide((i) => (i + 1) % SLIDES.length), SLIDE_MS);
+    return () => clearInterval(t);
+  }, [still, chosenCity]);
+  const heroPhoto: Photo & { url: string; name: string; page: string } | null = curated
+    ? { ...curated, url: photoUrl(curated), page: photoPage(curated) }
+    : chosenCity && cityPhoto?.hero
+      ? { file: cityPhoto.hero, caption: findCity(chosenCity)?.name ?? "", credit: "Wikipedia", license: "see source", url: cityPhoto.hero, name: findCity(chosenCity)?.name ?? "", page: cityPhoto.creditUrl }
+      : chosenCity
+        ? null
+        : { ...SLIDES[slide], url: photoUrl(SLIDES[slide]), page: photoPage(SLIDES[slide]) };
+  const flapName = (heroPhoto?.name ?? (chosenCity ? findCity(chosenCity)?.name : "") ?? "").toUpperCase().slice(0, 12);
 
   const mode = calendarMode(search.tripType);
   const problem = searchProblem(search);
@@ -237,7 +270,21 @@ export function Landing({ trip, dispatch, hasSavedTrip, onPlan, onConcierge, onC
     <div className={s.home}>
       <section className={s.landing} aria-labelledby={`${ids}-title`}>
         <div className={s.backdrop} aria-hidden>
-          <div className={s.photo} data-loaded={loaded} style={{ backgroundImage: `url("${photoUrl(photo)}")` }} key={photo.file} />
+          {SLIDES.map((x, i) => {
+            const show = !chosenCity && i === slide;
+            const near = !chosenCity && (i === slide || i === (slide + 1) % SLIDES.length);
+            return (
+              <div
+                key={x.file}
+                className={`${s.photo} ${show && !still ? "drift" : ""}`}
+                data-loaded={show}
+                style={near ? { backgroundImage: `url("${photoUrl(x)}")` } : undefined}
+              />
+            );
+          })}
+          {chosenCity && heroPhoto && (
+            <div key={heroPhoto.url} className={`${s.photo} ${still ? "" : "drift"}`} data-loaded style={{ backgroundImage: `url("${heroPhoto.url}")` }} />
+          )}
           <SkyArc still={still} />
         </div>
 
@@ -246,6 +293,12 @@ export function Landing({ trip, dispatch, hasSavedTrip, onPlan, onConcierge, onC
           <h1 id={`${ids}-title`} className={`display ${s.title}`}>
             Where to <em>next</em>?
           </h1>
+          {flapName && (
+            <p className={s.nextStop} aria-live="polite">
+              <span className={s.nextLabel}>{chosenCity ? "Your next stop" : "Next stop"}</span>
+              <SplitFlap value={flapName} size="md" tone="brass" label={flapName} />
+            </p>
+          )}
 
           <form id={`${ids}-composer`} className={s.composer} data-type={search.tripType} onSubmit={(e) => { e.preventDefault(); start(); }} noValidate>
             <div className={s.types} role="radiogroup" aria-label="Trip type">
@@ -356,17 +409,17 @@ export function Landing({ trip, dispatch, hasSavedTrip, onPlan, onConcierge, onC
           </button>
         </div>
 
-        {loaded && (
+        {heroPhoto && (
           <p className={s.credit}>
-            <a href={photoPage(photo)} target="_blank" rel="noreferrer">{photo.caption}</a> · {photo.credit} · {photo.license}
+            {heroPhoto && <><a href={heroPhoto.page} target="_blank" rel="noreferrer">{heroPhoto.caption}</a> · {heroPhoto.credit} · {heroPhoto.license}</>}
           </p>
         )}
       </section>
 
       <div className={s.below}>
-        <TripCards trip={trip} hasSavedTrip={hasSavedTrip} userId={userId} linkedTripId={linkedTripId} onContinue={onContinue} onOpenTrip={(t) => onOpenTrip?.(t)} />
-        <IdeasSection months={chosenMonths} onPick={pickIdea} />
-        <DealsSection
+        <div className="reveal"><TripCards trip={trip} hasSavedTrip={hasSavedTrip} userId={userId} linkedTripId={linkedTripId} onContinue={onContinue} onOpenTrip={(t) => onOpenTrip?.(t)} /></div>
+        <div className="reveal"><IdeasSection months={chosenMonths} onPick={pickIdea} /></div>
+        <div className="reveal"><DealsSection
           from={search.home}
           to={dealTo && findCity(dealTo) ? dealTo : undefined}
           month={search.departDate.slice(0, 7)}
@@ -376,24 +429,13 @@ export function Landing({ trip, dispatch, hasSavedTrip, onPlan, onConcierge, onC
           onPickMonth={pickMonth}
           onPickDestination={pickDestination}
         />
-        <StopoversSection highlight={routeProgrammes} onPlan={planStopover} />
+        </div>
+        <div className="reveal"><StopoversSection highlight={routeProgrammes} onPlan={planStopover} /></div>
       </div>
     </div>
   );
 }
 
-/** True once the photo has loaded; stays false when images are blocked (the gradient shows instead). */
-function usePhotoLoaded(url: string) {
-  const [loaded, setLoaded] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    const img = new Image();
-    img.onload = () => { if (live) setLoaded(url); };
-    img.src = url;
-    return () => { live = false; };
-  }, [url]);
-  return loaded === url;
-}
 
 // A quadratic arc across the sky (viewBox units). The plane rides it; reduced motion parks it.
 // It arcs over the headline; a CSS mask fades it out behind the centred text.

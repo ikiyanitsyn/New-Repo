@@ -1,310 +1,270 @@
 /*
- * Theme options for the style board (/styles). Each palette sets the same tokens as
- * globals.css, for light and dark. Chosen palettes apply to the whole app via
- * <html data-palette="…">; previews on the board use .pv[data-palette][data-mode].
- * With no data-palette, the original midnight + brass look applies.
+ * Style-board palettes. "Riviera" is the default (the tokens in globals.css); these are
+ * its sister variants, applied app-wide via <html data-palette="…">. Previews on the
+ * board use .pv[data-palette][data-mode]; .pv[data-palette="classic"] shows Riviera.
  */
-
-/* ---- Evergreen ---- */
-:root[data-palette="evergreen"], .pv[data-palette="evergreen"] {
-  --bg: #f4efe4;
-  --surface: rgb(255 252 245 / 0.92);
-  --surface-solid: #fffcf5;
-  --surface-sunk: #eee6d6;
-  --ink: #1c2a23;
-  --ink-2: #4c5a51;
-  --ink-3: #878d84;
-  --line: #e1d7c4;
-  --line-strong: #cdbfa6;
-  --accent: #94692a;
-  --accent-soft: rgb(148 105 42 / 0.12);
-  --on-accent: #fffaf0;
-  --ground: #2c6a4e;
-  --ground-soft: rgb(44 106 78 / 0.12);
-  --good: #2c6a4e;
-  --warn: #a8641c;
-  --bad: #a8432f;
-  --ocean: #d3e0d6;
-  --land: #fbf6ec;
-  --land-active: #ecdfc4;
-  --border-map: #c7bca2;
-  --graticule: rgb(28 42 35 / 0.07);
-  --shadow: 0 1px 2px rgb(60 45 20 / 0.06), 0 14px 34px -14px rgb(60 45 20 / 0.22);
-  --pin-sleep: #94692a;
-  --pin-see: #3d6a8a;
-  --pin-do: #2c6a4e;
-  --pin-eat: #bd5d3c;
-  --pin-drink: #875891;
-  --pin-buy: #6b6458;
-  --radius: 14px; --radius-sm: 8px; --radius-lg: 22px;
+.pv[data-palette="classic"] {
+  --bg: #f7f2e8;
+  --surface: rgb(255 253 248 / 0.92);
+  --surface-solid: #fffdf8;
+  --surface-sunk: #f0e8d9;
+  --ink: #0e2b3c;
+  --ink-2: #41606f;
+  --ink-3: #7f97a3;
+  --line: #e7ddca;
+  --line-strong: #d5c6aa;
+  --accent: #d9583a;
+  --accent-soft: rgb(217 88 58 / 0.11);
+  --on-accent: #ffffff;
+  --ground: #127f9a;
+  --ground-soft: rgb(18 127 154 / 0.11);
+  --good: #16876a;
+  --warn: #c98a12;
+  --bad: #c23d3a;
+  --ocean: #9fd3e0;
+  --land: #fbf6ea;
+  --land-active: #f5e1b0;
+  --border-map: #d3c4a2;
+  --graticule: rgb(14 43 60 / 0.06);
+  --shadow: 0 1px 3px rgb(14 43 60 / 0.07), 0 16px 36px -14px rgb(14 43 60 / 0.24);
+  --pin-sleep: #d9583a;
+  --pin-see: #1a6fb0;
+  --pin-do: #16876a;
+  --pin-eat: #e0a21a;
+  --pin-drink: #c2457a;
+  --pin-buy: #6e6a5f;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root[data-palette="evergreen"]:not([data-theme="light"]) {
-  --bg: #0e1813;
-  --surface: rgb(21 34 27 / 0.9);
-  --surface-solid: #15221b;
-  --surface-sunk: #0b140f;
-  --ink: #f1ead8;
-  --ink-2: #bab39f;
-  --ink-3: #7e8a7f;
-  --line: #233629;
-  --line-strong: #32493a;
-  --accent: #d6ae63;
-  --accent-soft: rgb(214 174 99 / 0.14);
-  --on-accent: #1a1408;
-  --ground: #7cc49f;
-  --ground-soft: rgb(124 196 159 / 0.14);
-  --good: #7cc49f;
-  --warn: #e3a85a;
-  --bad: #e58a73;
-  --ocean: #0b1510;
-  --land: #1a2a21;
-  --land-active: #2c3424;
-  --border-map: #30463a;
-  --graticule: rgb(241 234 216 / 0.05);
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.6);
-  --pin-sleep: #d6ae63;
-  --pin-see: #8db3d6;
-  --pin-do: #7cc49f;
-  --pin-eat: #ec9a7a;
-  --pin-drink: #c79ad0;
-  --pin-buy: #b0a99a;
-    color-scheme: dark;
-  }
-}
-:root[data-palette="evergreen"][data-theme="dark"], .pv[data-palette="evergreen"][data-mode="dark"] {
-  --bg: #0e1813;
-  --surface: rgb(21 34 27 / 0.9);
-  --surface-solid: #15221b;
-  --surface-sunk: #0b140f;
-  --ink: #f1ead8;
-  --ink-2: #bab39f;
-  --ink-3: #7e8a7f;
-  --line: #233629;
-  --line-strong: #32493a;
-  --accent: #d6ae63;
-  --accent-soft: rgb(214 174 99 / 0.14);
-  --on-accent: #1a1408;
-  --ground: #7cc49f;
-  --ground-soft: rgb(124 196 159 / 0.14);
-  --good: #7cc49f;
-  --warn: #e3a85a;
-  --bad: #e58a73;
-  --ocean: #0b1510;
-  --land: #1a2a21;
-  --land-active: #2c3424;
-  --border-map: #30463a;
-  --graticule: rgb(241 234 216 / 0.05);
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.6);
-  --pin-sleep: #d6ae63;
-  --pin-see: #8db3d6;
-  --pin-do: #7cc49f;
-  --pin-eat: #ec9a7a;
-  --pin-drink: #c79ad0;
-  --pin-buy: #b0a99a;
+.pv[data-palette="classic"][data-mode="dark"] {
+  --bg: #061c27;
+  --surface: rgb(11 41 56 / 0.9);
+  --surface-solid: #0b2938;
+  --surface-sunk: #04151e;
+  --ink: #f6efe1;
+  --ink-2: #b3c8d0;
+  --ink-3: #6d8c99;
+  --line: #163a4b;
+  --line-strong: #21495d;
+  --accent: #ff8762;
+  --accent-soft: rgb(255 135 98 / 0.15);
+  --on-accent: #2b0d04;
+  --ground: #4fcbe0;
+  --ground-soft: rgb(79 203 224 / 0.14);
+  --good: #5fd4ab;
+  --warn: #f4c34f;
+  --bad: #ff7f6e;
+  --ocean: #06212d;
+  --land: #123647;
+  --land-active: #2d4337;
+  --border-map: #285569;
+  --graticule: rgb(246 239 225 / 0.05);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 18px 42px -16px rgb(0 0 0 / 0.65);
+  --pin-sleep: #ff8762;
+  --pin-see: #7cc0ff;
+  --pin-do: #5fd4ab;
+  --pin-eat: #f4c34f;
+  --pin-drink: #f08ab4;
+  --pin-buy: #b9b3a4;
   color-scheme: dark;
 }
 
-/* ---- Brass Night ---- */
-:root[data-palette="brassnight"], .pv[data-palette="brassnight"] {
-  --bg: #f1efe9;
-  --surface: rgb(252 251 247 / 0.92);
-  --surface-solid: #fcfbf7;
-  --surface-sunk: #ebe8e0;
-  --ink: #141c18;
-  --ink-2: #4a544f;
-  --ink-3: #838a85;
-  --line: #dcd8cd;
-  --line-strong: #c6c0b2;
-  --accent: #8c6524;
-  --accent-soft: rgb(140 101 36 / 0.11);
-  --on-accent: #fffaf0;
-  --ground: #24624f;
-  --ground-soft: rgb(36 98 79 / 0.11);
-  --good: #24624f;
-  --warn: #9a6216;
-  --bad: #a13a36;
-  --ocean: #d2dbd6;
-  --land: #f7f5ef;
-  --land-active: #ebe3d0;
-  --border-map: #bfc4bc;
-  --graticule: rgb(20 28 24 / 0.07);
-  --shadow: 0 1px 2px rgb(20 28 24 / 0.06), 0 12px 32px -12px rgb(20 28 24 / 0.2);
-  --pin-sleep: #8c6524;
-  --pin-see: #3b5d8a;
-  --pin-do: #24624f;
-  --pin-eat: #a84f37;
-  --pin-drink: #7a4a8a;
-  --pin-buy: #56616c;
-  --radius: 10px; --radius-sm: 6px; --radius-lg: 18px;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root[data-palette="brassnight"]:not([data-theme="light"]) {
-  --bg: #0a0f0d;
-  --surface: rgb(18 24 21 / 0.9);
-  --surface-solid: #121815;
-  --surface-sunk: #080c0a;
-  --ink: #f3eee2;
-  --ink-2: #aeb2aa;
-  --ink-3: #6f7770;
-  --line: #1f2924;
-  --line-strong: #2d3a33;
-  --accent: #e2b55c;
-  --accent-soft: rgb(226 181 92 / 0.14);
-  --on-accent: #17120a;
-  --ground: #5fb796;
-  --ground-soft: rgb(95 183 150 / 0.13);
-  --good: #5fb796;
-  --warn: #e0a85a;
-  --bad: #e27c74;
-  --ocean: #070b09;
-  --land: #151d19;
-  --land-active: #262c22;
-  --border-map: #26332c;
-  --graticule: rgb(243 238 226 / 0.05);
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 18px 44px -16px rgb(0 0 0 / 0.7);
-  --pin-sleep: #e2b55c;
-  --pin-see: #8aa7e6;
-  --pin-do: #5fb796;
-  --pin-eat: #e08a6f;
-  --pin-drink: #c094d0;
-  --pin-buy: #a7b0a9;
-    color-scheme: dark;
-  }
-}
-:root[data-palette="brassnight"][data-theme="dark"], .pv[data-palette="brassnight"][data-mode="dark"] {
-  --bg: #0a0f0d;
-  --surface: rgb(18 24 21 / 0.9);
-  --surface-solid: #121815;
-  --surface-sunk: #080c0a;
-  --ink: #f3eee2;
-  --ink-2: #aeb2aa;
-  --ink-3: #6f7770;
-  --line: #1f2924;
-  --line-strong: #2d3a33;
-  --accent: #e2b55c;
-  --accent-soft: rgb(226 181 92 / 0.14);
-  --on-accent: #17120a;
-  --ground: #5fb796;
-  --ground-soft: rgb(95 183 150 / 0.13);
-  --good: #5fb796;
-  --warn: #e0a85a;
-  --bad: #e27c74;
-  --ocean: #070b09;
-  --land: #151d19;
-  --land-active: #262c22;
-  --border-map: #26332c;
-  --graticule: rgb(243 238 226 / 0.05);
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 18px 44px -16px rgb(0 0 0 / 0.7);
-  --pin-sleep: #e2b55c;
-  --pin-see: #8aa7e6;
-  --pin-do: #5fb796;
-  --pin-eat: #e08a6f;
-  --pin-drink: #c094d0;
-  --pin-buy: #a7b0a9;
-  color-scheme: dark;
-}
-
-/* ---- Garden Party ---- */
-:root[data-palette="garden"], .pv[data-palette="garden"] {
-  --bg: #fbf7ee;
+/* ---- Lagoon ---- */
+:root[data-palette="lagoon"], .pv[data-palette="lagoon"] {
+  --bg: #eef7f5;
   --surface: rgb(255 255 255 / 0.92);
   --surface-solid: #ffffff;
-  --surface-sunk: #f3eee2;
-  --ink: #1a382d;
-  --ink-2: #4a6157;
-  --ink-3: #86978e;
-  --line: #e7e0d0;
-  --line-strong: #d6ccb6;
-  --accent: #c4832a;
-  --accent-soft: rgb(196 131 42 / 0.13);
+  --surface-sunk: #e2efec;
+  --ink: #0b2f3a;
+  --ink-2: #41606f;
+  --ink-3: #7f97a3;
+  --line: #d6e6e2;
+  --line-strong: #bcd5cf;
+  --accent: #0a9396;
+  --accent-soft: rgb(10 147 150 / 0.12);
   --on-accent: #ffffff;
-  --ground: #2b8a68;
-  --ground-soft: rgb(43 138 104 / 0.12);
-  --good: #2b8a68;
-  --warn: #c4832a;
-  --bad: #d0573d;
-  --ocean: #cfe6dc;
-  --land: #fffbf2;
-  --land-active: #f6e6c4;
-  --border-map: #d2c6a8;
-  --graticule: rgb(26 56 45 / 0.06);
-  --shadow: 0 1px 3px rgb(26 56 45 / 0.06), 0 16px 36px -14px rgb(26 56 45 / 0.2);
-  --pin-sleep: #c4832a;
-  --pin-see: #3f7fc2;
-  --pin-do: #2b8a68;
-  --pin-eat: #e0674a;
-  --pin-drink: #a45cb5;
-  --pin-buy: #7a7466;
-  --radius: 18px; --radius-sm: 10px; --radius-lg: 26px;
+  --ground: #1d5fa8;
+  --ground-soft: rgb(29 95 168 / 0.11);
+  --good: #16876a;
+  --warn: #c98a12;
+  --bad: #c23d3a;
+  --ocean: #8fd6d8;
+  --land: #f7fbf9;
+  --land-active: #d9efe3;
+  --border-map: #d3c4a2;
+  --graticule: rgb(14 43 60 / 0.06);
+  --shadow: 0 1px 3px rgb(14 43 60 / 0.07), 0 16px 36px -14px rgb(14 43 60 / 0.24);
+  --pin-sleep: #0a9396;
+  --pin-see: #1a6fb0;
+  --pin-do: #16876a;
+  --pin-eat: #e0a21a;
+  --pin-drink: #c2457a;
+  --pin-buy: #6e6a5f;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root[data-palette="garden"]:not([data-theme="light"]) {
-  --bg: #11211b;
-  --surface: rgb(24 43 35 / 0.9);
-  --surface-solid: #182b23;
-  --surface-sunk: #0d1a15;
-  --ink: #f4efe2;
-  --ink-2: #bfc6b9;
-  --ink-3: #86978e;
-  --line: #28403a;
-  --line-strong: #36524a;
-  --accent: #f0b350;
-  --accent-soft: rgb(240 179 80 / 0.15);
-  --on-accent: #1c1405;
-  --ground: #6fd1a8;
-  --ground-soft: rgb(111 209 168 / 0.15);
-  --good: #6fd1a8;
-  --warn: #f0b350;
-  --bad: #f08a70;
-  --ocean: #0d1a15;
-  --land: #1d3229;
-  --land-active: #33402c;
-  --border-map: #355046;
-  --graticule: rgb(244 239 226 / 0.05);
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.55);
-  --pin-sleep: #f0b350;
-  --pin-see: #8cc0f0;
-  --pin-do: #6fd1a8;
-  --pin-eat: #f59478;
-  --pin-drink: #d39ae0;
-  --pin-buy: #b8b2a3;
+  :root[data-palette="lagoon"]:not([data-theme="light"]) {
+    --bg: #04212a;
+    --surface: rgb(10 47 58 / 0.9);
+    --surface-solid: #0a2f3a;
+    --surface-sunk: #031920;
+    --ink: #f6efe1;
+    --ink-2: #b3c8d0;
+    --ink-3: #6d8c99;
+    --line: #163a4b;
+    --line-strong: #21495d;
+    --accent: #3fd0c9;
+    --accent-soft: rgb(63 208 201 / 0.15);
+    --on-accent: #03221f;
+    --ground: #7ab8ff;
+    --ground-soft: rgb(122 184 255 / 0.14);
+    --good: #5fd4ab;
+    --warn: #f4c34f;
+    --bad: #ff7f6e;
+    --ocean: #06212d;
+    --land: #123647;
+    --land-active: #2d4337;
+    --border-map: #285569;
+    --graticule: rgb(246 239 225 / 0.05);
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 18px 42px -16px rgb(0 0 0 / 0.65);
+    --pin-sleep: #3fd0c9;
+    --pin-see: #7cc0ff;
+    --pin-do: #5fd4ab;
+    --pin-eat: #f4c34f;
+    --pin-drink: #f08ab4;
+    --pin-buy: #b9b3a4;
     color-scheme: dark;
   }
 }
-:root[data-palette="garden"][data-theme="dark"], .pv[data-palette="garden"][data-mode="dark"] {
-  --bg: #11211b;
-  --surface: rgb(24 43 35 / 0.9);
-  --surface-solid: #182b23;
-  --surface-sunk: #0d1a15;
-  --ink: #f4efe2;
-  --ink-2: #bfc6b9;
-  --ink-3: #86978e;
-  --line: #28403a;
-  --line-strong: #36524a;
-  --accent: #f0b350;
-  --accent-soft: rgb(240 179 80 / 0.15);
-  --on-accent: #1c1405;
-  --ground: #6fd1a8;
-  --ground-soft: rgb(111 209 168 / 0.15);
-  --good: #6fd1a8;
-  --warn: #f0b350;
-  --bad: #f08a70;
-  --ocean: #0d1a15;
-  --land: #1d3229;
-  --land-active: #33402c;
-  --border-map: #355046;
-  --graticule: rgb(244 239 226 / 0.05);
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.55);
-  --pin-sleep: #f0b350;
-  --pin-see: #8cc0f0;
-  --pin-do: #6fd1a8;
-  --pin-eat: #f59478;
-  --pin-drink: #d39ae0;
-  --pin-buy: #b8b2a3;
+:root[data-palette="lagoon"][data-theme="dark"], .pv[data-palette="lagoon"][data-mode="dark"] {
+  --bg: #04212a;
+  --surface: rgb(10 47 58 / 0.9);
+  --surface-solid: #0a2f3a;
+  --surface-sunk: #031920;
+  --ink: #f6efe1;
+  --ink-2: #b3c8d0;
+  --ink-3: #6d8c99;
+  --line: #163a4b;
+  --line-strong: #21495d;
+  --accent: #3fd0c9;
+  --accent-soft: rgb(63 208 201 / 0.15);
+  --on-accent: #03221f;
+  --ground: #7ab8ff;
+  --ground-soft: rgb(122 184 255 / 0.14);
+  --good: #5fd4ab;
+  --warn: #f4c34f;
+  --bad: #ff7f6e;
+  --ocean: #06212d;
+  --land: #123647;
+  --land-active: #2d4337;
+  --border-map: #285569;
+  --graticule: rgb(246 239 225 / 0.05);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 18px 42px -16px rgb(0 0 0 / 0.65);
+  --pin-sleep: #3fd0c9;
+  --pin-see: #7cc0ff;
+  --pin-do: #5fd4ab;
+  --pin-eat: #f4c34f;
+  --pin-drink: #f08ab4;
+  --pin-buy: #b9b3a4;
+  color-scheme: dark;
+}
+
+/* ---- Amalfi Sunset ---- */
+:root[data-palette="sunset"], .pv[data-palette="sunset"] {
+  --bg: #fdf3ec;
+  --surface: rgb(255 250 246 / 0.92);
+  --surface-solid: #fffaf6;
+  --surface-sunk: #f6e6da;
+  --ink: #2a1d33;
+  --ink-2: #5e4d63;
+  --ink-3: #9a8a96;
+  --line: #efdccd;
+  --line-strong: #e0c6b1;
+  --accent: #c8366e;
+  --accent-soft: rgb(200 54 110 / 0.11);
+  --on-accent: #ffffff;
+  --ground: #1679a8;
+  --ground-soft: rgb(18 127 154 / 0.11);
+  --good: #16876a;
+  --warn: #c98a12;
+  --bad: #c23d3a;
+  --ocean: #a6d6e8;
+  --land: #fff8f0;
+  --land-active: #fbe0c2;
+  --border-map: #d3c4a2;
+  --graticule: rgb(14 43 60 / 0.06);
+  --shadow: 0 1px 3px rgb(14 43 60 / 0.07), 0 16px 36px -14px rgb(14 43 60 / 0.24);
+  --pin-sleep: #c8366e;
+  --pin-see: #1a6fb0;
+  --pin-do: #16876a;
+  --pin-eat: #e0a21a;
+  --pin-drink: #c2457a;
+  --pin-buy: #6e6a5f;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette="sunset"]:not([data-theme="light"]) {
+    --bg: #1a0f20;
+    --surface: rgb(38 23 46 / 0.9);
+    --surface-solid: #26172e;
+    --surface-sunk: #120a17;
+    --ink: #fbeee6;
+    --ink-2: #d0bccb;
+    --ink-3: #8f7a8c;
+    --line: #3a2742;
+    --line-strong: #4b3355;
+    --accent: #ff6fa3;
+    --accent-soft: rgb(255 111 163 / 0.15);
+    --on-accent: #2a0614;
+    --ground: #5cc6f2;
+    --ground-soft: rgb(79 203 224 / 0.14);
+    --good: #5fd4ab;
+    --warn: #f4c34f;
+    --bad: #ff7f6e;
+    --ocean: #140b1a;
+    --land: #2a1b33;
+    --land-active: #43303a;
+    --border-map: #4b3355;
+    --graticule: rgb(246 239 225 / 0.05);
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 18px 42px -16px rgb(0 0 0 / 0.65);
+    --pin-sleep: #ff6fa3;
+    --pin-see: #7cc0ff;
+    --pin-do: #5fd4ab;
+    --pin-eat: #f4c34f;
+    --pin-drink: #f08ab4;
+    --pin-buy: #b9b3a4;
+    color-scheme: dark;
+  }
+}
+:root[data-palette="sunset"][data-theme="dark"], .pv[data-palette="sunset"][data-mode="dark"] {
+  --bg: #1a0f20;
+  --surface: rgb(38 23 46 / 0.9);
+  --surface-solid: #26172e;
+  --surface-sunk: #120a17;
+  --ink: #fbeee6;
+  --ink-2: #d0bccb;
+  --ink-3: #8f7a8c;
+  --line: #3a2742;
+  --line-strong: #4b3355;
+  --accent: #ff6fa3;
+  --accent-soft: rgb(255 111 163 / 0.15);
+  --on-accent: #2a0614;
+  --ground: #5cc6f2;
+  --ground-soft: rgb(79 203 224 / 0.14);
+  --good: #5fd4ab;
+  --warn: #f4c34f;
+  --bad: #ff7f6e;
+  --ocean: #140b1a;
+  --land: #2a1b33;
+  --land-active: #43303a;
+  --border-map: #4b3355;
+  --graticule: rgb(246 239 225 / 0.05);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 18px 42px -16px rgb(0 0 0 / 0.65);
+  --pin-sleep: #ff6fa3;
+  --pin-see: #7cc0ff;
+  --pin-do: #5fd4ab;
+  --pin-eat: #f4c34f;
+  --pin-drink: #f08ab4;
+  --pin-buy: #b9b3a4;
   color-scheme: dark;
 }
 
@@ -322,72 +282,6 @@
 :root[data-font="fraunces"] .display, .pv[data-font="fraunces"] .display { font-weight: 480; font-variation-settings: "SOFT" 60, "WONK" 0; }
 
 
-/* ---- Original (for side-by-side previews on the style board) ---- */
-.pv[data-palette="classic"] {
-  --bg: #eef0ed;
-  --surface: rgb(252 252 250 / 0.9);
-  --surface-solid: #fcfcfa;
-  --surface-sunk: #f2f3f0;
-  --ink: #131a22;
-  --ink-2: #4c5662;
-  --ink-3: #828a93;
-  --line: #d9ddd7;
-  --line-strong: #c3c9c3;
-  --accent: #8a6628;
-  --accent-soft: rgb(138 102 40 / 0.1);
-  --on-accent: #fffaf0;
-  --ground: #2b7464;
-  --ground-soft: rgb(43 116 100 / 0.1);
-  --good: #2c6f50;
-  --warn: #9a6216;
-  --bad: #a13a36;
-  --ocean: #d3dcdf;
-  --land: #f6f6f2;
-  --land-active: #ebe6da;
-  --border-map: #bcc5c7;
-  --graticule: rgb(19 26 34 / 0.07);
-  --shadow: 0 1px 2px rgb(19 26 34 / 0.05), 0 12px 32px -12px rgb(19 26 34 / 0.18);
-  --pin-sleep: #8a6628;
-  --pin-see: #3b5998;
-  --pin-do: #2b7464;
-  --pin-eat: #a84f37;
-  --pin-drink: #7a4a8a;
-  --pin-buy: #56616c;
-  --radius: 10px; --radius-sm: 6px; --radius-lg: 18px;
-  color-scheme: light;
-}
-.pv[data-palette="classic"][data-mode="dark"] {
-  --bg: #0a0f16;
-  --surface: rgb(17 23 32 / 0.88);
-  --surface-solid: #111720;
-  --surface-sunk: #0d131b;
-  --ink: #ebe7df;
-  --ink-2: #a7aeb6;
-  --ink-3: #6c757f;
-  --line: #222d39;
-  --line-strong: #314050;
-  --accent: #cfa760;
-  --accent-soft: rgb(207 167 96 / 0.12);
-  --on-accent: #17120a;
-  --ground: #62b8a3;
-  --ground-soft: rgb(98 184 163 / 0.12);
-  --good: #6cc39a;
-  --warn: #e0a85a;
-  --bad: #e27c74;
-  --ocean: #0b121b;
-  --land: #18212c;
-  --land-active: #262a2b;
-  --border-map: #2c3a49;
-  --graticule: rgb(235 231 223 / 0.05);
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.6);
-  --pin-sleep: #cfa760;
-  --pin-see: #8aa7e6;
-  --pin-do: #62b8a3;
-  --pin-eat: #e08a6f;
-  --pin-drink: #c094d0;
-  --pin-buy: #a7b0b9;
-  color-scheme: dark;
-}
 .pv[data-font="bodoni"] {
   --font-display: "Bodoni Moda Variable", "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
 }

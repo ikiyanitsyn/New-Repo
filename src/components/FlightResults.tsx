@@ -9,6 +9,7 @@ import { dayDiff, fmtDay, fmtTime } from "@/lib/format";
 import type { FlightPick, Leg, Trip } from "@/lib/trip";
 import { BoltIcon, ExternalIcon, PlaneIcon } from "./icons";
 import { SplitFlap } from "./SplitFlap";
+import { PlaneLoader } from "./PlaneLoader";
 import { CollapseButton } from "./planner/CollapseButton";
 import { FareDetails } from "./planner/FareDetails";
 import { LayoverControls } from "./planner/LayoverControls";
@@ -116,7 +117,13 @@ export function FlightResults({ leg, trip, pick, onPick, onPickDate, onCollapse 
         {data?.notices.map((n) => (
           <p key={n} className="mx-2 rounded-md px-3 py-2 text-[12.5px]" style={{ background: "var(--surface-sunk)", color: "var(--ink-2)" }}>{n}</p>
         ))}
-        {loading && !data && Array.from({ length: 5 }).map((_, i) => <div key={i} className="skeleton mx-2 h-[76px]" />)}
+        {loading && !data && (
+          <div className="flex flex-col items-center gap-1 py-3 text-[12.5px] text-ink-3">
+            <PlaneLoader label="Finding fares" />
+            Finding fares…
+          </div>
+        )}
+        {loading && !data && Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton mx-2 h-[76px]" />)}
         {error && <p className="mx-2 text-[13px] text-[var(--bad)]">{error}. Try again in a moment.</p>}
         {!loading && data && sorted.length === 0 && (
           <p className="mx-2 py-6 text-center text-[13.5px] text-ink-2">
@@ -129,7 +136,7 @@ export function FlightResults({ leg, trip, pick, onPick, onPickDate, onCollapse 
             )}
           </p>
         )}
-        <ul className={`flex flex-col gap-2 transition-opacity ${loading ? "opacity-50" : ""}`}>
+        <ul className={`cascade flex flex-col gap-2 transition-opacity ${loading ? "opacity-50" : ""}`}>
           {sorted.map((o, i) => (
             <OfferRow
               key={o.id}
@@ -192,7 +199,7 @@ function OfferRow({
   const arriveDays = o.arriveLocal ? dayDiff(o.departLocal, o.arriveLocal) : 0;
   return (
     <li
-      className="mx-1 rounded-lg border px-3.5 py-3 transition-colors"
+      className="lift mx-1 rounded-lg border px-3.5 py-3 transition-colors"
       style={{ borderColor: chosen ? "var(--accent)" : "var(--line)", background: chosen ? "var(--accent-soft)" : "var(--surface-solid)" }}
     >
       <div className="flex items-start justify-between gap-3">

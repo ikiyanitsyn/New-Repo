@@ -4,8 +4,8 @@
  * Deep ink cells with warm-white or brass characters in both themes.
  */
 .sf {
-  --sf-bg: #161c24;
-  --sf-bg-2: #0f141a;
+  --sf-bg: #0e2b3c;
+  --sf-bg-2: #0a2230;
   --sf-ink: #f1e9d8;
   --sf-edge: rgb(255 255 255 / 0.09);
   --sf-hinge: rgb(0 0 0 / 0.55);
@@ -17,18 +17,18 @@
   font-weight: 500;
   line-height: 1;
 }
-.sf-brass { --sf-ink: #dcb877; }
+.sf-brass { --sf-ink: #ffd166; }
 
 /* On the dark panels the cells are lifted a little so they still read as tiles. */
 :root[data-theme="dark"] .sf {
-  --sf-bg: #26303c;
-  --sf-bg-2: #1d252f;
+  --sf-bg: #16425a;
+  --sf-bg-2: #123749;
   --sf-edge: rgb(255 255 255 / 0.14);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .sf {
-    --sf-bg: #26303c;
-    --sf-bg-2: #1d252f;
+    --sf-bg: #16425a;
+    --sf-bg-2: #123749;
     --sf-edge: rgb(255 255 255 / 0.14);
   }
 }

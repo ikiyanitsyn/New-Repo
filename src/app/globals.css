@@ -4,124 +4,125 @@
  * Intercontinental Nomad — design tokens.
  * Layout concept: a night-flight window. The globe fills the stage; the
  * itinerary and fares sit on quiet glass panels like seat-back cards.
- * Color: cool porcelain / midnight ink, one brass accent (flights), jade for ground travel.
+ * Color: "Riviera": whitewashed sand and deep-sea navy, terracotta coral (flights, actions),
+ * Mediterranean turquoise (trains), lemon highlights; rounder shapes (see docs/DESIGN.md).
  * Type: Bodoni Moda for place names and headings, Instrument Sans for reading,
  * IBM Plex Mono for airport codes, times and fares.
  */
 :root {
-  --bg: #eef0ed;
-  --surface: rgb(252 252 250 / 0.9);
-  --surface-solid: #fcfcfa;
-  --surface-sunk: #f2f3f0;
-  --ink: #131a22;
-  --ink-2: #4c5662;
-  --ink-3: #828a93;
-  --line: #d9ddd7;
-  --line-strong: #c3c9c3;
-  --accent: #8a6628;
-  --accent-soft: rgb(138 102 40 / 0.1);
-  --on-accent: #fffaf0;
-  --ground: #2b7464;
-  --ground-soft: rgb(43 116 100 / 0.1);
-  --good: #2c6f50;
-  --warn: #9a6216;
-  --bad: #a13a36;
-  --ocean: #d3dcdf;
-  --land: #f6f6f2;
-  --land-active: #ebe6da;
-  --border-map: #bcc5c7;
-  --graticule: rgb(19 26 34 / 0.07);
-  --shadow: 0 1px 2px rgb(19 26 34 / 0.05), 0 12px 32px -12px rgb(19 26 34 / 0.18);
-  --pin-sleep: #8a6628;
-  --pin-see: #3b5998;
-  --pin-do: #2b7464;
-  --pin-eat: #a84f37;
-  --pin-drink: #7a4a8a;
-  --pin-buy: #56616c;
+  --bg: #f7f2e8;
+  --surface: rgb(255 253 248 / 0.92);
+  --surface-solid: #fffdf8;
+  --surface-sunk: #f0e8d9;
+  --ink: #0e2b3c;
+  --ink-2: #41606f;
+  --ink-3: #7f97a3;
+  --line: #e7ddca;
+  --line-strong: #d5c6aa;
+  --accent: #d9583a;
+  --accent-soft: rgb(217 88 58 / 0.11);
+  --on-accent: #ffffff;
+  --ground: #127f9a;
+  --ground-soft: rgb(18 127 154 / 0.11);
+  --good: #16876a;
+  --warn: #c98a12;
+  --bad: #c23d3a;
+  --ocean: #9fd3e0;
+  --land: #fbf6ea;
+  --land-active: #f5e1b0;
+  --border-map: #d3c4a2;
+  --graticule: rgb(14 43 60 / 0.06);
+  --shadow: 0 1px 3px rgb(14 43 60 / 0.07), 0 16px 36px -14px rgb(14 43 60 / 0.24);
+  --pin-sleep: #d9583a;
+  --pin-see: #1a6fb0;
+  --pin-do: #16876a;
+  --pin-eat: #e0a21a;
+  --pin-drink: #c2457a;
+  --pin-buy: #6e6a5f;
 
   --font-display: "Bodoni Moda Variable", "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
   --font-body: "Instrument Sans Variable", "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  --radius: 10px;
-  --radius-sm: 6px;
-  --radius-lg: 18px; /* hero composers, photo cards (see docs/DESIGN.md) */
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-lg: 26px; /* hero composers, photo cards (see docs/DESIGN.md) */
   --shadow-lg: 0 2px 6px rgb(19 26 34 / 0.08), 0 28px 64px -24px rgb(19 26 34 / 0.4);
 
   /* Fixed in both themes: text and marks laid over photos, which always sit under a dark scrim. */
-  --midnight: #0a0f16;
+  --midnight: #061c27;
   --porcelain: #fcfcfa;
-  --brass-light: #cfa760;
+  --brass-light: #ffd166; /* sunlit lemon: accents laid over photos */
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0a0f16;
-    --surface: rgb(17 23 32 / 0.88);
-    --surface-solid: #111720;
-    --surface-sunk: #0d131b;
-    --ink: #ebe7df;
-    --ink-2: #a7aeb6;
-    --ink-3: #6c757f;
-    --line: #222d39;
-    --line-strong: #314050;
-    --accent: #cfa760;
-    --accent-soft: rgb(207 167 96 / 0.12);
-    --on-accent: #17120a;
-    --ground: #62b8a3;
-    --ground-soft: rgb(98 184 163 / 0.12);
-    --good: #6cc39a;
-    --warn: #e0a85a;
-    --bad: #e27c74;
-    --ocean: #0b121b;
-    --land: #18212c;
-    --land-active: #262a2b;
-    --border-map: #2c3a49;
-    --graticule: rgb(235 231 223 / 0.05);
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.6);
+    --bg: #061c27;
+    --surface: rgb(11 41 56 / 0.9);
+    --surface-solid: #0b2938;
+    --surface-sunk: #04151e;
+    --ink: #f6efe1;
+    --ink-2: #b3c8d0;
+    --ink-3: #6d8c99;
+    --line: #163a4b;
+    --line-strong: #21495d;
+    --accent: #ff8762;
+    --accent-soft: rgb(255 135 98 / 0.15);
+    --on-accent: #2b0d04;
+    --ground: #4fcbe0;
+    --ground-soft: rgb(79 203 224 / 0.14);
+    --good: #5fd4ab;
+    --warn: #f4c34f;
+    --bad: #ff7f6e;
+    --ocean: #06212d;
+    --land: #123647;
+    --land-active: #2d4337;
+    --border-map: #285569;
+    --graticule: rgb(246 239 225 / 0.05);
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 18px 42px -16px rgb(0 0 0 / 0.65);
     --shadow-lg: 0 2px 6px rgb(0 0 0 / 0.35), 0 32px 72px -24px rgb(0 0 0 / 0.75);
-    --pin-sleep: #cfa760;
-    --pin-see: #8aa7e6;
-    --pin-do: #62b8a3;
-    --pin-eat: #e08a6f;
-    --pin-drink: #c094d0;
-    --pin-buy: #a7b0b9;
+    --pin-sleep: #ff8762;
+    --pin-see: #7cc0ff;
+    --pin-do: #5fd4ab;
+    --pin-eat: #f4c34f;
+    --pin-drink: #f08ab4;
+    --pin-buy: #b9b3a4;
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0a0f16;
-  --surface: rgb(17 23 32 / 0.88);
-  --surface-solid: #111720;
-  --surface-sunk: #0d131b;
-  --ink: #ebe7df;
-  --ink-2: #a7aeb6;
-  --ink-3: #6c757f;
-  --line: #222d39;
-  --line-strong: #314050;
-  --accent: #cfa760;
-  --accent-soft: rgb(207 167 96 / 0.12);
-  --on-accent: #17120a;
-  --ground: #62b8a3;
-  --ground-soft: rgb(98 184 163 / 0.12);
-  --good: #6cc39a;
-  --warn: #e0a85a;
-  --bad: #e27c74;
-  --ocean: #0b121b;
-  --land: #18212c;
-  --land-active: #262a2b;
-  --border-map: #2c3a49;
-  --graticule: rgb(235 231 223 / 0.05);
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.6);
+  --bg: #061c27;
+  --surface: rgb(11 41 56 / 0.9);
+  --surface-solid: #0b2938;
+  --surface-sunk: #04151e;
+  --ink: #f6efe1;
+  --ink-2: #b3c8d0;
+  --ink-3: #6d8c99;
+  --line: #163a4b;
+  --line-strong: #21495d;
+  --accent: #ff8762;
+  --accent-soft: rgb(255 135 98 / 0.15);
+  --on-accent: #2b0d04;
+  --ground: #4fcbe0;
+  --ground-soft: rgb(79 203 224 / 0.14);
+  --good: #5fd4ab;
+  --warn: #f4c34f;
+  --bad: #ff7f6e;
+  --ocean: #06212d;
+  --land: #123647;
+  --land-active: #2d4337;
+  --border-map: #285569;
+  --graticule: rgb(246 239 225 / 0.05);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 18px 42px -16px rgb(0 0 0 / 0.65);
   --shadow-lg: 0 2px 6px rgb(0 0 0 / 0.35), 0 32px 72px -24px rgb(0 0 0 / 0.75);
-  --pin-sleep: #cfa760;
-  --pin-see: #8aa7e6;
-  --pin-do: #62b8a3;
-  --pin-eat: #e08a6f;
-  --pin-drink: #c094d0;
-  --pin-buy: #a7b0b9;
+  --pin-sleep: #ff8762;
+  --pin-see: #7cc0ff;
+  --pin-do: #5fd4ab;
+  --pin-eat: #f4c34f;
+  --pin-drink: #f08ab4;
+  --pin-buy: #b9b3a4;
   color-scheme: dark;
 }
 
@@ -935,3 +936,43 @@ a.provider-credit { text-decoration: underline; text-underline-offset: 2px; }
   .explorer .maplibregl-ctrl-bottom-right,
   .explorer .maplibregl-ctrl-bottom-left { margin-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* ---------- Motion (adventure, but calm) ----------
+ * Lists cascade in, cards lift under the pointer, sections reveal as you scroll,
+ * hero photos drift slowly. All of it stops for "reduce motion".
+ */
+@keyframes cascade-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.cascade > *,
+.stay-grid > *,
+.picks > *,
+.explorer-body ul.flex-col > li { animation: cascade-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.cascade > :nth-child(2), .stay-grid > :nth-child(2), .picks > :nth-child(2), .explorer-body ul.flex-col > li:nth-child(2) { animation-delay: 0.05s; }
+.cascade > :nth-child(3), .stay-grid > :nth-child(3), .picks > :nth-child(3), .explorer-body ul.flex-col > li:nth-child(3) { animation-delay: 0.1s; }
+.cascade > :nth-child(4), .stay-grid > :nth-child(4), .explorer-body ul.flex-col > li:nth-child(4) { animation-delay: 0.15s; }
+.cascade > :nth-child(5), .stay-grid > :nth-child(5), .explorer-body ul.flex-col > li:nth-child(5) { animation-delay: 0.2s; }
+.cascade > :nth-child(n + 6), .stay-grid > :nth-child(n + 6), .explorer-body ul.flex-col > li:nth-child(n + 6) { animation-delay: 0.25s; }
+
+.lift, .stay-card, .pick { transition: transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.28s, border-color 0.2s; }
+@media (hover: hover) {
+  .lift:hover, .stay-card:hover, .pick:hover { transform: translateY(-3px); box-shadow: 0 20px 40px -22px rgb(14 43 60 / 0.42); }
+}
+
+/* Slow drift on hero photos (home and city guide). */
+@keyframes drift { from { transform: scale(1.02) translate3d(0, 0, 0); } to { transform: scale(1.12) translate3d(-2%, -1.5%, 0); } }
+.drift { animation: drift 22s ease-in-out infinite alternate; will-change: transform; }
+
+/* Sections fade up the first time they scroll into view (see useReveal). */
+.js-reveal .reveal:not(.is-in) { opacity: 0; transform: translateY(22px); }
+.reveal { transition: opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cascade > *, .stay-grid > *, .picks > *, .explorer-body ul.flex-col > li { animation: none; }
+  .lift:hover, .stay-card:hover, .pick:hover { transform: none; }
+  .drift { animation: none; }
+  .js-reveal .reveal:not(.is-in) { opacity: 1; transform: none; }
+}
+
+/* City guide banner: a slow pan across the wide photo. */
+@keyframes hero-pan { from { background-position: 32% 50%; } to { background-position: 68% 50%; } }
+.explorer-hero.has-photo { animation: hero-pan 28s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) { .explorer-hero.has-photo { animation: none; } }

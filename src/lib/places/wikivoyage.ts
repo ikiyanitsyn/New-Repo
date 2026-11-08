@@ -29,7 +29,7 @@ export const articleTitle = (cityCode: string) => {
 };
 export const articleUrl = (title: string) => `${BASE}/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
 
-async function raw(title: string, depth = 0): Promise<{ title: string; text: string }> {
+export async function raw(title: string, depth = 0): Promise<{ title: string; text: string }> {
   const res = await fetch(`${BASE}/w/index.php?title=${encodeURIComponent(title)}&action=raw`, {
     headers: HEADERS,
     signal: AbortSignal.timeout(12000),

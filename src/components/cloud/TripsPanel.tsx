@@ -113,12 +113,12 @@ export function TripsPanel({ tab, auth, sync, onTab, onOpened, onClose, onNewTri
             )}
           </div>
         ) : (
-          <div className={s.grid}>
+          <div className={`cascade ${s.grid}`}>
             {shown.map((t) => {
               const current = sync.link?.tripId === t.id;
               const route = t.trip ? [t.trip.home, ...t.trip.stops.map((x) => x.city)].join(" → ") : "";
               return (
-                <article key={t.id} className={`${s.card} ${current ? s.cardCurrent : ""}`}>
+                <article key={t.id} className={`lift ${s.card} ${current ? s.cardCurrent : ""}`}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="eyebrow">{current ? "Open now" : ROLE_LABEL[t.role]}</span>
                     {current && <span className="chip chip-accent">{ROLE_LABEL[t.role]}</span>}

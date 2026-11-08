@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { PlaneLoader } from "./PlaneLoader";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtShort } from "@/lib/format";
 import { readHotelsCache, writeHotelsCache } from "@/lib/hotels/cache";
@@ -461,6 +462,7 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
                         <button type="button" className="btn !h-10" disabled={liveLoading || !hstatus} onClick={showLive}>
                           {liveLoading ? "Checking prices…" : "Show live prices"}
                         </button>
+                        {liveLoading && <PlaneLoader label="Checking hotel prices" />}
                         {hstatus && <span className="live-note">Uses 1 of {Math.max(0, hstatus.quota.limit - hstatus.quota.used)} searches left this month.</span>}
                       </>
                     )}

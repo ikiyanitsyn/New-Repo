@@ -1,14 +1,13 @@
 "use client";
 
 /** Palette and heading font choices from the style board, applied to the whole app. */
-export type Palette = "classic" | "evergreen" | "brassnight" | "garden";
+export type Palette = "classic" | "lagoon" | "sunset";
 export type HeadingFont = "bodoni" | "fraunces" | "manrope";
 
 export const PALETTES: { id: Palette; name: string; blurb: string }[] = [
-  { id: "classic", name: "Original", blurb: "Midnight ink, porcelain and brass. The look you have today." },
-  { id: "evergreen", name: "Evergreen", blurb: "Forest green and warm cream with brass. Earthy, calm and inviting." },
-  { id: "brassnight", name: "Brass Night", blurb: "Near-black green with bright brass and jade. Cinematic after dark, crisp by day." },
-  { id: "garden", name: "Garden Party", blurb: "Ivory, emerald and marigold with rounder shapes. The friendliest and most colourful." },
+  { id: "classic", name: "Riviera", blurb: "Whitewashed sand, deep-sea navy, terracotta coral and Mediterranean turquoise, with lemon highlights. The new default." },
+  { id: "lagoon", name: "Lagoon", blurb: "Turquoise water and island blue on soft white. Breezy and beachy." },
+  { id: "sunset", name: "Amalfi Sunset", blurb: "Bougainvillea pink and sea blue on warm peach light. Romantic evenings on the coast." },
 ];
 
 export const FONTS: { id: HeadingFont; name: string; blurb: string }[] = [

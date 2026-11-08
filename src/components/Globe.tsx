@@ -54,14 +54,25 @@ const emph = (id: string, selected: string | null) => (selected === null || id =
 const legLine = (l: Leg): LngLat[] =>
   bentArc(l.from, l.to, l.distanceKm > 3000 ? 128 : 32, l.mode === "flight" ? arcBend(l.distanceKm) : 0);
 
-function routes(legs: Leg[], selected: string | null): FeatureCollection<LineString> {
+/**
+ * `progress` (0–1) draws the trip one leg after another, for the "routes that
+ * draw themselves" animation; 1 (the default) shows every leg in full.
+ */
+function routes(legs: Leg[], selected: string | null, progress = 1): FeatureCollection<LineString> {
+  const n = Math.max(1, legs.length);
   return {
     type: "FeatureCollection",
-    features: legs.map((l) => ({
-      type: "Feature",
-      properties: { id: l.id, kind: l.mode === "flight" ? "air" : "ground", selected: l.id === selected ? 1 : 0, emph: emph(l.id, selected) },
-      geometry: { type: "LineString", coordinates: legLine(l) },
-    })),
+    features: legs.flatMap((l, i) => {
+      const share = Math.min(1, Math.max(0, progress * n - i));
+      if (share <= 0) return [];
+      const line = legLine(l);
+      const coords = share >= 1 ? line : line.slice(0, Math.max(2, Math.ceil(line.length * share)));
+      return [{
+        type: "Feature" as const,
+        properties: { id: l.id, kind: l.mode === "flight" ? "air" : "ground", selected: l.id === selected ? 1 : 0, emph: emph(l.id, selected) },
+        geometry: { type: "LineString" as const, coordinates: coords },
+      }];
+    }),
   };
 }
 
@@ -269,6 +280,7 @@ export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, o
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const placed = useRef<Placed[]>([]);
+  const drawing = useRef(0);
   const ready = useRef(false);
   const onSelectRef = useRef(onSelectLeg);
   onSelectRef.current = onSelectLeg;
@@ -359,8 +371,27 @@ export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, o
 
   function sync(map: MLMap, ml: typeof import("maplibre-gl"), fit: boolean) {
     const { home, stops, legs, selectedLegId } = latest.current;
-    (map.getSource("routes") as GeoJSONSource | undefined)?.setData(routes(legs, selectedLegId));
-    (map.getSource("planes") as GeoJSONSource | undefined)?.setData(planes(legs, selectedLegId));
+    const routeSrc = map.getSource("routes") as GeoJSONSource | undefined;
+    const planeSrc = map.getSource("planes") as GeoJSONSource | undefined;
+    cancelAnimationFrame(drawing.current);
+    if (fit && legs.length && !prefersReducedMotion()) {
+      // Draw the route in, leg by leg, then let the planes take off.
+      const start = performance.now();
+      const total = Math.min(2600, 700 + legs.length * 320);
+      planeSrc?.setData({ type: "FeatureCollection", features: [] });
+      const step = (now: number) => {
+        const t = Math.min(1, (now - start) / total);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const cur = latest.current;
+        routeSrc?.setData(routes(cur.legs, cur.selectedLegId, eased));
+        if (t < 1) drawing.current = requestAnimationFrame(step);
+        else planeSrc?.setData(planes(cur.legs, cur.selectedLegId));
+      };
+      drawing.current = requestAnimationFrame(step);
+    } else {
+      routeSrc?.setData(routes(legs, selectedLegId));
+      planeSrc?.setData(planes(legs, selectedLegId));
+    }
 
     placed.current.forEach((p) => p.marker.remove());
     placed.current = [];

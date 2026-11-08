@@ -397,3 +397,20 @@ button.dealCard:hover { border-color: var(--ink-3); box-shadow: var(--shadow); }
   .liveMeta { grid-column: 1 / -1; grid-row: 2; }
   .bars { height: 110px; }
 }
+
+/* ---- Motion: cards cascade in, lift under the pointer, sections reveal on scroll ---- */
+@keyframes homeCascade { from { opacity: 0; transform: translateY(14px) scale(0.985); } to { opacity: 1; transform: none; } }
+.ideaGrid > *, .dealGrid > *, .stopGrid > * { animation: homeCascade 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.ideaGrid > :nth-child(2), .dealGrid > :nth-child(2), .stopGrid > :nth-child(2) { animation-delay: 0.06s; }
+.ideaGrid > :nth-child(3), .dealGrid > :nth-child(3), .stopGrid > :nth-child(3) { animation-delay: 0.12s; }
+.ideaGrid > :nth-child(4), .dealGrid > :nth-child(4), .stopGrid > :nth-child(4) { animation-delay: 0.18s; }
+.ideaGrid > :nth-child(5), .dealGrid > :nth-child(5), .stopGrid > :nth-child(5) { animation-delay: 0.24s; }
+.ideaGrid > :nth-child(n + 6), .dealGrid > :nth-child(n + 6), .stopGrid > :nth-child(n + 6) { animation-delay: 0.3s; }
+.idea, .dealCard, .stopCard, .tripCard { transition: transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.28s, border-color 0.2s; }
+@media (hover: hover) {
+  .idea:hover, .dealCard:hover, .stopCard:hover, .tripCard:hover { transform: translateY(-4px); box-shadow: 0 22px 44px -22px rgb(14 43 60 / 0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ideaGrid > *, .dealGrid > *, .stopGrid > * { animation: none; }
+  .idea:hover, .dealCard:hover, .stopCard:hover, .tripCard:hover { transform: none; }
+}
