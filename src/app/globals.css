@@ -278,6 +278,8 @@ h1, h2, h3 {
 .app {
   display: grid;
   grid-template-rows: auto 1fr;
+  /* One column that never grows past the screen, whatever is inside. */
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
 }
 

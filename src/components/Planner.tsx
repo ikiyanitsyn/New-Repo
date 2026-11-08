@@ -72,6 +72,20 @@ export function Planner() {
     } catch {}
   }, [trip, started]);
 
+  // Another tab (e.g. the itinerary page) changed the trip: take its version,
+  // so this tab's next save doesn't overwrite those edits.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY || !e.newValue) return;
+      try {
+        const t = JSON.parse(e.newValue);
+        if (isTrip(t)) dispatch({ type: "load", trip: t });
+      } catch {}
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   // Accounts: keep the open trip in step with its copy in the cloud (when signed in and linked).
   const auth = useAuth();
   const sync = useTripSync(trip, dispatch, auth, started);
