@@ -1,4 +1,5 @@
 import "server-only";
+import { consumeSerpapi, serpapiQuota } from "../serpapiQuota";
 import { searchLinks } from "./links";
 import { sampleOffers } from "./sample";
 import { serpapiSearch } from "./serpapi";
@@ -15,15 +16,8 @@ import type { FlightQuery, FlightSearchResult } from "./types";
 
 const CACHE_TTL_MS = { cached: 6 * 3600_000, live: 12 * 3600_000 };
 const cache = new Map<string, { at: number; value: FlightSearchResult }>();
-const liveUsage = { month: "", used: 0 };
-
-const liveLimit = () => Number(process.env.SERPAPI_MONTHLY_LIMIT || 200);
-
-function liveQuota() {
-  const month = new Date().toISOString().slice(0, 7);
-  if (liveUsage.month !== month) Object.assign(liveUsage, { month, used: 0 });
-  return { used: liveUsage.used, limit: liveLimit() };
-}
+// Shared with the hotel prices: one SerpApi allowance for both.
+const liveQuota = () => serpapiQuota();
 
 const key = (mode: string, q: FlightQuery) => [mode, q.from, q.to, q.date, q.adults, q.cabin, q.directOnly].join("|");
 
@@ -45,9 +39,10 @@ export async function searchFlights(q: FlightQuery, mode: "cached" | "live"): Pr
   try {
     if (mode === "live") {
       if (!serpKey) throw new Error("Live prices need a SerpApi key. See docs/SETUP_GUIDE.md.");
-      const quota = liveQuota();
-      if (quota.used >= quota.limit) throw new Error(`This month's live searches are used up (${quota.used}/${quota.limit}).`);
-      liveUsage.used++;
+      if (!consumeSerpapi()) {
+        const quota = liveQuota();
+        throw new Error(`This month's live searches are used up (${quota.used}/${quota.limit}).`);
+      }
       const r = await serpapiSearch(q, serpKey);
       result = { ...base, source: "serpapi", offers: r.offers, notices: r.notices };
     } else if (tpToken) {

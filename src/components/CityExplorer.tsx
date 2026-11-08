@@ -3,14 +3,19 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtShort } from "@/lib/format";
+import { readHotelsCache, writeHotelsCache } from "@/lib/hotels/cache";
+import { hotelBookingUrl, parseTypedPrice, toChosenHotel } from "@/lib/hotels/choose";
+import { fmtChecked, fmtUsd, nightlyLine, pinPriceLabel } from "@/lib/hotels/format";
+import { isLivePlaceId, livePlace, matchHotels } from "@/lib/hotels/match";
+import type { HotelsResult, HotelsStatus, LiveHotel } from "@/lib/hotels/types";
 import { fmtCount, priceShort, priceSymbol, stayPinLabel } from "@/lib/places/display";
-import { placeLinks, staySearchLinks } from "@/lib/places/links";
-import { findPlaceByName } from "@/lib/places/match";
+import { placeLinks, staySearchLinks, type OutLink } from "@/lib/places/links";
+import { findPlaceByName, nameSimilarity } from "@/lib/places/match";
 import { featureScore, picksFor, subcategoryOf, subcategoryOrder } from "@/lib/places/subcategory";
 import {
   CATEGORY_LABEL, type Comfort, type Place, type PlaceCategory, type PlaceRating, type PlacesResult, type RatingsProviderInfo, type RatingsResult,
 } from "@/lib/places/types";
-import { placeKey, type SavedPlace, type StopWithDates } from "@/lib/trip";
+import { placeKey, type ChosenHotel, type SavedPlace, type StopWithDates } from "@/lib/trip";
 import {
   ArrowIcon, BagIcon, BedIcon, ColumnsIcon, CompassIcon, ExternalIcon, ForkIcon, GlassIcon, HeartIcon, ListIcon, MapIcon,
 } from "./icons";
@@ -29,6 +34,10 @@ interface Props {
   comfort?: Comfort;
   /** Open this place's page once the guide loads (deep link from the concierge or the URL). */
   initialPlaceName?: string;
+  /** The hotel the traveller chose for this stop, if any. */
+  hotel?: ChosenHotel;
+  /** Save (or, with null, clear) the chosen hotel for this stop. */
+  onChooseHotel?: (hotel: ChosenHotel | null) => void;
 }
 
 type Tab = PlaceCategory | "saved";
@@ -65,7 +74,12 @@ function hook(p: Place, max = 120): string | undefined {
 
 type Ratings = Record<string, PlaceRating | null>;
 
-export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNavigate, onClose, comfort, initialPlaceName }: Props) {
+/** Is a guide or price-result hotel the one the traveller chose? Same name, near enough. */
+function sameHotel(hotel: ChosenHotel | undefined, p: Place, cityName: string): boolean {
+  return !!hotel && nameSimilarity(hotel.name, p.name, [cityName]) >= 0.9;
+}
+
+export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNavigate, onClose, comfort, initialPlaceName, hotel, onChooseHotel }: Props) {
   const index = Math.max(0, stops.findIndex((s) => s.id === stopId));
   const stop = stops[index];
   const city = stop.cityInfo;
@@ -85,6 +99,21 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [shown, setShown] = useState(LIST_STEP);
   const [phoneView, setPhoneView] = useState<"list" | "map">("list");
+
+  // Desktop: the list is a panel that slides over a full-screen map. The map keeps the uncovered part centred.
+  const [panelOpen, setPanelOpen] = useState(true);
+  const guideRef = useRef<HTMLDivElement>(null);
+  const [panelWidth, setPanelWidth] = useState(0); // 0 on phones, where the list and map take turns
+  useEffect(() => {
+    const el = guideRef.current;
+    if (!el) return;
+    const wide = window.matchMedia("(min-width: 861px)");
+    const measure = () => setPanelWidth(wide.matches ? el.offsetWidth : 0);
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    wide.addEventListener("change", measure);
+    return () => { ro.disconnect(); wide.removeEventListener("change", measure); };
+  }, []);
 
   const [state, setState] = useState<{ city: string; data?: PlacesResult; error?: string } | null>(null);
   const loading = state?.city !== city.code;
@@ -110,9 +139,59 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
   const provider = ratingsHere.provider;
   const asked = useRef(new Set<string>());
 
+  // Live hotel prices: only when the traveller asks (each ask spends one of the monthly SerpApi searches).
+  const liveKey = `${city.code}|${stop.arrive}|${stop.depart}|${adults}`;
+  const [live, setLive] = useState<{ key: string; phase: "loading" | "ok" | "error"; data?: HotelsResult; error?: string } | null>(null);
+  const [hstatus, setHstatus] = useState<HotelsStatus | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch("/api/hotels?status=1", { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j) setHstatus(j); })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, []);
+  // Prices from the last 12 hours that the browser already holds: free to show.
+  const stored = useMemo(() => (typeof window === "undefined" ? null : readHotelsCache(liveKey)), [liveKey]);
+  const liveHere = live?.key === liveKey ? live : null;
+  const liveData = liveHere?.data ?? (liveHere?.phase === "error" ? null : stored);
+  const liveLoading = liveHere?.phase === "loading";
+  const showLive = () => {
+    const key = liveKey;
+    setLive({ key, phase: "loading" });
+    const qs = new URLSearchParams({ city: city.code, checkin: stop.arrive, checkout: stop.depart, adults: String(adults) });
+    fetch(`/api/hotels?${qs}`)
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok) {
+          if (j.code === "no_key") setHstatus((h) => ({ quota: { used: 0, limit: 0 }, ...h, available: false }));
+          throw new Error(j.error || "Couldn't get live prices");
+        }
+        writeHotelsCache(key, j);
+        setHstatus((h) => ({ available: true, ...h, quota: j.quota }));
+        setLive({ key, phase: "ok", data: j });
+      })
+      .catch((e) => setLive({ key, phase: "error", error: e.message }));
+  };
+
   const savedKeys = useMemo(() => new Set(saved.map((s) => s.key)), [saved]);
   const all = useMemo(() => data?.places ?? [], [data]);
   const withSub = useMemo(() => all.map((p) => ({ place: p, sub: subcategoryOf(p) })), [all]);
+  const matches = useMemo(
+    () => (liveData ? matchHotels(all.filter((p) => p.category === "sleep"), liveData.hotels, city) : null),
+    [liveData, all, city],
+  );
+  const liveOnly = useMemo(
+    () => (matches && liveData ? matches.unmatched.map((h) => livePlace(h, liveData.hotels.indexOf(h))) : []),
+    [matches, liveData],
+  );
+  const liveById = useMemo(() => {
+    const m: Record<string, LiveHotel> = { ...(matches?.byPlaceId ?? {}) };
+    liveOnly.forEach((p, i) => { m[p.id] = matches!.unmatched[i]; });
+    return m;
+  }, [matches, liveOnly]);
+  const stayPlaces = useMemo(() => [...all.filter((p) => p.category === "sleep"), ...liveOnly], [all, liveOnly]);
+  const chosenPlace = hotel ? stayPlaces.find((p) => sameHotel(hotel, p, city.name)) : undefined;
 
   // Deep link: once the guide loads, open the named place on its own tab.
   const deepKey = data && initialPlaceName ? `${city.code}|${initialPlaceName}` : null;
@@ -139,14 +218,14 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
   );
   const pickIds = new Set(picks.map((p) => p.place.id));
   const rest = visible.filter((p) => !pickIds.has(p.id));
-  const detail = all.find((p) => p.id === detailId) ?? null;
+  const detail = all.find((p) => p.id === detailId) ?? liveOnly.find((p) => p.id === detailId) ?? null;
   const tabCount = (t: Tab) => (t === "saved" ? saved.length : all.filter((p) => p.category === t).length);
   const tabs = TABS.filter((t) => t.id !== "buy" || tabCount("buy") > 0);
 
   // Which places to rate: the pick candidates, the rows on screen and the open place.
   const wanted = useMemo(() => {
     if (!data || data.error) return [];
-    if (detailId) return [detailId];
+    if (detailId) return isLivePlaceId(detailId) ? [] : [detailId];
     const candidates = tab === "saved" ? [] : [...visible].sort((a, b) => featureScore(b) - featureScore(a)).slice(0, PICK_CANDIDATES);
     const onScreen = visible.slice(0, shown + 3);
     return [...new Set([...candidates, ...onScreen].map((p) => p.id))];
@@ -202,14 +281,40 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
     if (Math.abs(dx) > 70 && Math.abs(dy) < 50) go(dx < 0 ? next : prev);
   };
 
+  const nightsCount = stop.nights;
+  const bookingFor = (name: string) => hotelBookingUrl(name, city, stop.arrive, stop.depart, adults);
+  const choose = (p: Place, manual?: number) =>
+    onChooseHotel?.(toChosenHotel({
+      name: p.name, lat: p.lat, lon: p.lon,
+      live: liveById[p.id], livePricedAt: liveData?.fetchedAt,
+      manualNightly: manual, bookingUrl: bookingFor(p.name),
+    }));
+  const setManualPrice = (nightly: number) => {
+    if (!hotel) return;
+    onChooseHotel?.({ ...hotel, nightly, source: "manual", pricedAt: new Date().toISOString() });
+  };
+  const listRef = useRef<HTMLDivElement>(null);
   const stays = staySearchLinks(city, stop.arrive, stop.depart, adults);
   const role = index === 0 ? "Arriving" : index === stops.length - 1 ? "Final stop" : `Stop ${index + 1} of ${stops.length}`;
-  const mapPlaces = useMemo(() => (detail ? [detail] : visible), [detail, visible]);
+  const mapPlaces = useMemo(
+    () => (detail ? [detail] : tab === "sleep" && sub === "all" ? [...visible, ...liveOnly] : visible),
+    [detail, visible, liveOnly, tab, sub],
+  );
   const pinLabels: Record<string, string> = {};
   for (const p of mapPlaces) {
-    const label = p.category === "sleep" ? stayPinLabel(p, ratings[p.id], !!provider?.showOnMap) : undefined;
+    if (p.category !== "sleep") continue;
+    // A live price beats the guide's price text and the rating. Pills show the nightly price, "$142".
+    // Once live prices are on, pills without one stay plain beds, so every "$142" on the map is a live price.
+    const label = pinPriceLabel(liveById[p.id]?.nightly) ?? (liveData ? undefined : stayPinLabel(p, ratings[p.id], !!provider?.showOnMap));
     if (label) pinLabels[p.id] = label;
   }
+  const myHotelPos = hotel
+    ? hotel.lat !== undefined && hotel.lon !== undefined
+      ? { name: hotel.name, lat: hotel.lat, lon: hotel.lon }
+      : chosenPlace?.lat !== undefined && chosenPlace.lon !== undefined
+        ? { name: hotel.name, lat: chosenPlace.lat, lon: chosenPlace.lon }
+        : null
+    : null;
   const anyRated = provider && visible.some((p) => ratings[p.id]?.rating !== undefined);
   const isStays = tab === "sleep";
 
@@ -221,6 +326,9 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
         label={label}
         sub={subcategoryOf(p)}
         rating={ratings[p.id]}
+        live={liveById[p.id]}
+        chosen={sameHotel(hotel, p, city.name)}
+        onChoose={onChooseHotel ? () => choose(p) : undefined}
         saved={savedKeys.has(placeKey(p.name))}
         onSave={() => toggleSave(p)}
         onOpen={() => open(p.id)}
@@ -240,8 +348,8 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
     );
 
   return (
-    <section className="explorer" data-view={phoneView} aria-label={`Explore ${city.name}`}>
-      <div className="explorer-guide" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    <section className="explorer" data-view={phoneView} data-panel={panelOpen ? "open" : "closed"} aria-label={`Explore ${city.name}`}>
+      <div id="explorer-panel" ref={guideRef} className="explorer-guide" inert={!panelOpen && panelWidth > 0} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {/* Hero: the city's banner photo when the guide has one */}
         <div
           key={`hero-${city.code}`}
@@ -295,13 +403,34 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
               onSave={() => toggleSave(detail)}
               onBack={() => setDetailId(null)}
               backLabel={tab === "saved" ? "Saved" : CATEGORY_LABEL[tab]}
-              links={placeLinks(detail, city)}
+              links={[
+                ...(detail.category === "sleep" ? [{ label: "Booking.com", url: bookingFor(detail.name) }] : []),
+                ...placeLinks(detail, city),
+                ...(liveById[detail.id]?.link ? [{ label: /google\./.test(liveById[detail.id].link!) ? "Google Hotels" : "Hotel website", url: liveById[detail.id].link! }] : []),
+              ]}
+              live={liveById[detail.id]}
+              livePricedAt={liveData?.fetchedAt}
+              nights={nightsCount}
+              chosen={sameHotel(hotel, detail, city.name)}
+              chosenSource={hotel?.source}
+              onChoose={onChooseHotel && detail.category === "sleep" ? (manual) => choose(detail, manual) : undefined}
             />
           ) : (
             <div className="flex flex-col gap-6 px-6 pb-10 pt-6">
               <h3 className="display text-[26px] leading-tight">
                 {tab === "saved" ? `Your saved places in ${city.name}` : HEADLINE[tab](city.name)}
               </h3>
+
+              {isStays && hotel && (
+                <MyHotelCard
+                  hotel={hotel}
+                  nights={nightsCount}
+                  onChange={() => listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  onRemove={() => onChooseHotel?.(null)}
+                  onPrice={setManualPrice}
+                  canEdit={!!onChooseHotel}
+                />
+              )}
 
               {isStays && (
                 <div className="stay-cta">
@@ -318,6 +447,24 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
                         {l.label} <ExternalIcon size={12} />
                       </a>
                     ))}
+                  </div>
+                  <div className="live-row">
+                    {liveData ? (
+                      <p className="live-note">
+                        <strong>Live prices</strong> from Google Hotels (via SerpApi), checked {fmtChecked(liveData.fetchedAt)}.
+                        Taxes and fees are included where Google shows them. Prices change, so confirm when you book.
+                      </p>
+                    ) : hstatus?.available === false ? (
+                      <p className="live-note">Live prices need a SerpApi key.</p>
+                    ) : (
+                      <>
+                        <button type="button" className="btn !h-10" disabled={liveLoading || !hstatus} onClick={showLive}>
+                          {liveLoading ? "Checking prices…" : "Show live prices"}
+                        </button>
+                        {hstatus && <span className="live-note">Uses 1 of {Math.max(0, hstatus.quota.limit - hstatus.quota.used)} searches left this month.</span>}
+                      </>
+                    )}
+                    {liveHere?.phase === "error" && <p className="live-note live-error" role="alert">{liveHere.error}</p>}
                   </div>
                 </div>
               )}
@@ -369,7 +516,7 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
               )}
 
               {rest.length > 0 && (
-                <section aria-label="All places" className="flex flex-col gap-1">
+                <section aria-label="All places" ref={listRef} className="flex flex-col gap-1 scroll-mt-4">
                   {picks.length > 0 && <div className="eyebrow pb-2">{isStays ? "More stays" : "More to explore"} · {rest.length}</div>}
                   {isStays ? (
                     <div className="stay-grid">{rest.slice(0, shown).map((p) => card(p))}</div>
@@ -397,12 +544,20 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
                 </section>
               )}
 
+              {isStays && !detail && sub === "all" && liveOnly.length > 0 && (
+                <section aria-label="More hotels with live prices" className="flex flex-col gap-3">
+                  <div className="eyebrow">Also available for your dates · {liveOnly.length}</div>
+                  <div className="stay-grid">{liveOnly.map((p) => card(p))}</div>
+                </section>
+              )}
+
               {data && !data.error && (
                 <p className="pt-2 text-[12.5px] leading-relaxed text-ink-3">
                   From the free travel guide{" "}
                   <a href={data.articleUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">Wikivoyage</a>
                   {" "}(text CC BY-SA) and Wikimedia photos.
-                  {anyRated && <> Ratings from {provider!.name}.</>} Confirm opening times with the venue.
+                  {anyRated && <> Ratings from {provider!.name}.</>}
+                  {liveData && isStays && <> Hotel prices and some ratings from Google Hotels via SerpApi.</>} Confirm opening times with the venue.
                 </p>
               )}
             </div>
@@ -417,11 +572,95 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
         hoverId={hoverId}
         pinLabels={pinLabels}
         onSelect={open}
+        leftPad={panelOpen ? panelWidth : 0}
+        myHotel={myHotelPos}
+        myHotelPlaceId={chosenPlace && chosenPlace.lat !== undefined ? chosenPlace.id : null}
       />
+
+      <button
+        type="button"
+        className="panel-handle"
+        aria-expanded={panelOpen}
+        aria-controls="explorer-panel"
+        aria-label={panelOpen ? "Hide the list" : "Show the list"}
+        onClick={() => setPanelOpen((v) => !v)}
+      >
+        <ArrowIcon size={16} className={panelOpen ? "rotate-180" : ""} />
+      </button>
 
       <button type="button" className="map-toggle" onClick={() => setPhoneView((v) => (v === "list" ? "map" : "list"))}>
         {phoneView === "list" ? <><MapIcon size={16} /> Map</> : <><ListIcon size={16} /> List</>}
       </button>
+    </section>
+  );
+}
+
+/** "Choose as my hotel", with an optional price field for hotels that have no live price. */
+function ChooseHotel({ chosen, chosenSource, hasLivePrice, onChoose }: {
+  chosen: boolean; chosenSource?: ChosenHotel["source"]; hasLivePrice: boolean; onChoose: (manual?: number) => void;
+}) {
+  const [text, setText] = useState("");
+  const typed = hasLivePrice ? undefined : parseTypedPrice(text);
+  return (
+    <div className="flex flex-col gap-2">
+      {!hasLivePrice && (
+        <label className="manual-price">
+          <span>Enter the price you found <span className="text-ink-3">(optional, USD a night)</span></span>
+          <span className="manual-input">
+            <span aria-hidden="true">$</span>
+            <input inputMode="decimal" placeholder="e.g. 120" value={text} onChange={(e) => setText(e.target.value)} />
+          </span>
+        </label>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="btn btn-primary" disabled={chosen && typed === undefined} onClick={() => onChoose(typed)}>
+          {chosen ? (typed !== undefined ? "Update my hotel" : "This is my hotel") : "Choose as my hotel"}
+        </button>
+        {chosen && chosenSource && <span className="text-[13px] text-ink-3">Saved to your trip.</span>}
+      </div>
+    </div>
+  );
+}
+
+/** The chosen hotel, large, at the top of the Stay tab. */
+function MyHotelCard({ hotel, nights, onChange, onRemove, onPrice, canEdit }: {
+  hotel: ChosenHotel; nights: number; onChange: () => void; onRemove: () => void; onPrice: (n: number) => void; canEdit: boolean;
+}) {
+  const [text, setText] = useState("");
+  const typed = parseTypedPrice(text);
+  const where = hotel.source === "google_hotels" ? "Google Hotels" : hotel.source === "manual" ? "the price you entered" : "";
+  return (
+    <section className="my-hotel" aria-label="My hotel">
+      <div className="eyebrow !text-accent">Your hotel</div>
+      <h3 className="display my-hotel-name">{hotel.name}</h3>
+      {hotel.nightly !== undefined ? (
+        <p className="text-[15px] text-ink-2">
+          <strong className="text-ink">{nightlyLine(hotel.nightly, nights)}</strong>
+          {where && <> · from {where}{hotel.pricedAt ? `, checked ${fmtChecked(hotel.pricedAt)}` : ""}</>}
+        </p>
+      ) : (
+        canEdit && (
+          <div className="manual-price">
+            <span>No price yet. Enter the price you found <span className="text-ink-3">(USD a night)</span></span>
+            <span className="flex items-center gap-2">
+              <span className="manual-input">
+                <span aria-hidden="true">$</span>
+                <input inputMode="decimal" placeholder="e.g. 120" value={text} onChange={(e) => setText(e.target.value)} aria-label="Nightly price in US dollars" />
+              </span>
+              <button type="button" className="btn !h-10" disabled={typed === undefined} onClick={() => { if (typed !== undefined) onPrice(typed); }}>Save price</button>
+            </span>
+          </div>
+        )
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        {hotel.bookingUrl && (
+          <a href={hotel.bookingUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary !h-10">
+            Book on Booking.com <ExternalIcon size={12} />
+          </a>
+        )}
+        {canEdit && <button type="button" className="btn !h-10" onClick={onChange}>Change</button>}
+        {canEdit && <button type="button" className="btn btn-ghost !h-10" onClick={onRemove}>Remove</button>}
+      </div>
     </section>
   );
 }
@@ -470,34 +709,50 @@ interface CardProps {
 }
 
 /** A stay, listing-card style: big photo, name and rating, a short hook, the price. */
-function StayCard({ place: p, label, sub, rating, saved, onSave, onOpen, onHover }: CardProps & { label?: string; sub: string }) {
+function StayCard({ place: p, label, sub, rating, live, chosen, onChoose, saved, onSave, onOpen, onHover }: CardProps & {
+  label?: string; sub: string; live?: LiveHotel; chosen: boolean; onChoose?: () => void;
+}) {
   const [imgOk, setImgOk] = useState(true);
   const price = priceShort(p.price);
   const symbol = priceSymbol(p, rating);
+  const shownRating: PlaceRating | null | undefined =
+    rating?.rating !== undefined || live?.rating === undefined ? rating : { rating: live.rating, count: live.reviews, reviews: [] };
+  const photo = p.thumb ?? live?.thumb;
   return (
     <article className="stay-card" onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)}>
       <button type="button" className="pick-open" onClick={onOpen} aria-label={`${p.name}: details`} />
       <div className="stay-photo">
-        {p.thumb && imgOk ? (
+        {photo && imgOk ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.thumb} alt="" loading="lazy" onError={() => setImgOk(false)} />
+          <img src={photo} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setImgOk(false)} />
         ) : (
           <span className="pick-photo-fallback display">{p.name.slice(0, 1)}</span>
         )}
-        {label && <span className="stay-badge">{label}</span>}
+        {(chosen || label) && <span className="stay-badge">{chosen ? "Your hotel" : label}</span>}
         <SaveButton saved={saved} onSave={onSave} name={p.name} overlay />
       </div>
       <div className="stay-text">
         <div className="flex items-start justify-between gap-3">
           <h4 className="display stay-name">{p.name}</h4>
-          <RatingLine rating={rating} />
+          <RatingLine rating={shownRating} />
         </div>
         <div className="stay-meta">{[sub, p.district].filter(Boolean).join(" · ")}</div>
         {hook(p, 110) && <p className="stay-hook">{hook(p, 110)}</p>}
-        {(price || symbol) && (
+        {live?.nightly !== undefined ? (
           <div className="stay-price">
-            {price ? <><strong>{price}</strong> a night</> : <><strong className="data">{symbol}</strong> {p.tier ?? ""}</>}
+            <strong>{fmtUsd(live.nightly)}</strong> a night <span className="price-src">· live, Google Hotels</span>
           </div>
+        ) : (
+          (price || symbol) && (
+            <div className="stay-price">
+              {price ? <><strong>{price}</strong> a night</> : <><strong className="data">{symbol}</strong> {p.tier ?? ""}</>}
+            </div>
+          )
+        )}
+        {onChoose && (
+          <button type="button" className={`choose-btn ${chosen ? "on" : ""}`} aria-pressed={chosen} onClick={onChoose} disabled={chosen}>
+            {chosen ? "Your hotel" : "Choose as my hotel"}
+          </button>
         )}
       </div>
     </article>
@@ -586,9 +841,12 @@ function Review({ review: r }: { review: PlaceRating["reviews"][number] }) {
   );
 }
 
-function PlaceDetail({ place: p, sub, rating, ratingPending, provider, saved, onSave, onBack, backLabel, links }: {
+function PlaceDetail({ place: p, sub, rating, ratingPending, provider, saved, onSave, onBack, backLabel, links, live, livePricedAt, nights, chosen, chosenSource, onChoose }: {
   place: Place; sub: string; rating?: PlaceRating | null; ratingPending: boolean; provider: RatingsProviderInfo | null;
-  saved: boolean; onSave: () => void; onBack: () => void; backLabel: string; links: { label: string; url: string }[];
+  saved: boolean; onSave: () => void; onBack: () => void; backLabel: string; links: OutLink[];
+  live?: LiveHotel; livePricedAt?: string; nights: number; chosen: boolean; chosenSource?: ChosenHotel["source"];
+  /** Present for stays when choosing is possible. `manual` is a price the traveller typed in. */
+  onChoose?: (manual?: number) => void;
 }) {
   const [imgOk, setImgOk] = useState(true);
   const facts: [string, string | undefined][] = [
@@ -641,6 +899,25 @@ function PlaceDetail({ place: p, sub, rating, ratingPending, provider, saved, on
             )}
             . Reviews are the authors&rsquo; own words.
           </p>
+        </section>
+      )}
+
+      {onChoose && (
+        <section className="price-box" aria-label="Price and my hotel">
+          {live?.nightly !== undefined ? (
+            <div className="flex flex-col gap-1">
+              <div className="price-big display">{fmtUsd(live.nightly)}<span> a night</span></div>
+              <p className="text-[13.5px] leading-relaxed text-ink-2">
+                {nights > 1 && <>About {fmtUsd(live.nightly * nights)} for {nights} nights. </>}
+                Live price from Google Hotels (via SerpApi), checked {fmtChecked(livePricedAt)}. Taxes and fees included where Google shows them. Confirm the price when you book.
+              </p>
+            </div>
+          ) : (
+            <p className="text-[14px] text-ink-2">
+              No live price for this hotel yet. Use <strong>Show live prices</strong> on the Stay tab, or book to see today&rsquo;s price.
+            </p>
+          )}
+          <ChooseHotel chosen={chosen} chosenSource={chosenSource} hasLivePrice={live?.nightly !== undefined} onChoose={onChoose} />
         </section>
       )}
 

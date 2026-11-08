@@ -1,0 +1,40 @@
+{
+  "search_metadata": { "status": "Success" },
+  "properties": [
+    {
+      "type": "hotel",
+      "name": "Park Hyatt Beijing",
+      "description": "Refined rooms in a CBD tower with a spa.",
+      "link": "https://www.hyatt.com/park-hyatt/pekph-park-hyatt-beijing",
+      "property_token": "tok1",
+      "gps_coordinates": { "latitude": 39.9087, "longitude": 116.4585 },
+      "hotel_class": "5-star hotel",
+      "extracted_hotel_class": 5,
+      "images": [{ "thumbnail": "https://lh3.googleusercontent.com/a=s287", "original_image": "https://lh3.googleusercontent.com/a=s10000" }],
+      "overall_rating": 4.6,
+      "reviews": 3120,
+      "rate_per_night": { "display_price": "$310", "extracted_display_price": 310, "lowest": "$355", "extracted_lowest": 355, "before_taxes_fees": "$310", "extracted_before_taxes_fees": 310 },
+      "total_rate": { "display_price": "$930", "extracted_display_price": 930, "lowest": "$1,065", "extracted_lowest": 1065 }
+    },
+    {
+      "type": "hotel",
+      "name": "The Opposite House",
+      "link": "https://www.google.com/aclk?sa=l",
+      "gps_coordinates": { "latitude": 39.9345, "longitude": 116.4474 },
+      "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:x",
+      "overall_rating": 4.7,
+      "reviews": 2410,
+      "rate_per_night": { "extracted_display_price": 280 }
+    },
+    {
+      "type": "hotel",
+      "name": "Hutong Courtyard Inn",
+      "gps_coordinates": { "latitude": 39.9381, "longitude": 116.4021 },
+      "rate_per_night": { "extracted_lowest": 96.4 }
+    },
+    { "type": "hotel", "name": "Sold Out Hotel", "gps_coordinates": { "latitude": 39.9, "longitude": 116.4 } },
+    { "type": "vacation rental", "name": "Sunny Flat Near Park", "rate_per_night": { "extracted_lowest": 70 } },
+    { "type": "hotel", "name": "park hyatt beijing", "rate_per_night": { "extracted_lowest": 999 } },
+    { "type": "hotel", "rate_per_night": { "extracted_lowest": 50 } }
+  ]
+}

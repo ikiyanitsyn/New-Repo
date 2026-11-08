@@ -177,6 +177,8 @@ export function Planner() {
             onClose={closeExplorer}
             comfort={comfortPref}
             initialPlaceName={hashPlace}
+            hotel={trip.hotels?.[datedStops.find((s) => s.id === exploreStopId)!.city]}
+            onChooseHotel={(hotel) => dispatch({ type: "hotel", city: datedStops.find((s) => s.id === exploreStopId)!.city, hotel })}
           />
         )}
         {tripsTab && (
