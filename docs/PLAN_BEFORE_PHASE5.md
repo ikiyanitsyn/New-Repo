@@ -171,3 +171,8 @@ F2. A tagline? (Currently "Where to next?")
 |---|---|---|---|
 | 1 | Home | From airport and return date aren't in the main search bar | Planned (step 1) |
 | 2 | Home | Search/plan page should be the home page | Planned (step 1) |
+| 3 | Home | Trip-type switch: one way / round trip / multi-city / stopover | Planned (step 1) |
+| 4 | Home | Calendar date range; "+ Add a city" in search | Planned (step 1) |
+| 5 | Home | Ideas: seasonal, deals from price data, airline stopover programmes | Planned (step 1) |
+| 6 | Fares | Layover controls (max stops, layover length, connection airports) | Planned (step 1) |
+| 7 | Home | Floating concierge suggestions while searching | Workshop |
