@@ -586,7 +586,101 @@ h1, h2, h3 {
 .explorer-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
 
 .explorer-body { flex: 1; min-height: 0; container-type: inline-size; }
-@media (min-width: 1280px) { .explorer { grid-template-columns: minmax(560px, 680px) 1fr; } }
+
+/* Desktop: the map fills the screen and the list is a panel sliding in from the left, with a handle to collapse it.
+ * Phones (max 860px) keep the list / map toggle below. */
+.panel-handle { display: none; }
+@media (min-width: 861px) {
+  .explorer { --panel-w: clamp(420px, 42vw, 640px); display: block; }
+  .explorer .city-map-wrap { position: absolute; inset: 0; }
+  .explorer-guide {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 3;
+    width: var(--panel-w);
+    border-right: 1px solid var(--line);
+    box-shadow: var(--shadow-lg);
+    transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s linear 0s;
+  }
+  .explorer[data-panel="closed"] .explorer-guide { transform: translateX(-102%); visibility: hidden; transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s linear 0.4s; }
+  .panel-handle {
+    position: absolute;
+    top: 50%;
+    left: var(--panel-w);
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 64px;
+    margin-top: -32px;
+    border-radius: 0 12px 12px 0;
+    color: var(--ink-2);
+    background: var(--surface-solid);
+    border: 1px solid var(--line);
+    border-left: 0;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: left 0.4s cubic-bezier(0.2, 0.7, 0.2, 1), color 0.15s;
+  }
+  .panel-handle:hover { color: var(--ink); }
+  .explorer[data-panel="closed"] .panel-handle { left: 0; }
+  .explorer .map-style-switch { top: 14px; right: 14px; }
+}
+
+/* Map style switch (Street / Satellite) */
+.map-style-switch {
+  position: absolute; top: 12px; right: 12px; z-index: 2;
+  display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px;
+  background: var(--surface-solid); border: 1px solid var(--line); box-shadow: var(--shadow);
+}
+.map-style-switch button {
+  height: 30px; padding-inline: 13px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  color: var(--ink-2); cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.map-style-switch button:hover { color: var(--ink); }
+.map-style-switch button[aria-pressed="true"] { background: var(--ink); color: var(--surface-solid); }
+.map-style-switch .labels-toggle { margin-left: 2px; border: 1px solid var(--line-strong); background: transparent; }
+.map-style-switch .labels-toggle[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); border-color: var(--accent); }
+.city-map .maplibregl-ctrl-attrib { font-size: 11px; max-width: min(70vw, 560px); }
+
+/* Live hotel prices, My hotel */
+.live-row { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.live-note { font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.live-note strong { color: var(--ink); }
+.live-error { color: var(--bad); }
+.price-src { font-size: 12.5px; color: var(--ink-3); }
+.choose-btn {
+  align-self: flex-start; position: relative; z-index: 2; margin-top: 8px; height: 34px; padding-inline: 14px;
+  border-radius: 999px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  color: var(--ink); border: 1px solid var(--line-strong); background: var(--surface-solid);
+  transition: background 0.15s, border-color 0.15s;
+}
+.choose-btn:hover:not(:disabled) { border-color: var(--ink); }
+.choose-btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); cursor: default; }
+.my-hotel {
+  display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; border-radius: var(--radius);
+  background: var(--surface-solid); border: 1.5px solid var(--accent); box-shadow: var(--shadow);
+}
+.my-hotel-name { font-size: 26px; line-height: 1.2; overflow-wrap: anywhere; }
+.price-box { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; border-radius: 14px; background: var(--accent-soft); }
+.price-big { font-size: 38px; line-height: 1; color: var(--ink); }
+.price-big span { font-family: var(--font-body); font-size: 15px; color: var(--ink-2); }
+.manual-price { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--ink-2); }
+.manual-input {
+  display: inline-flex; align-items: center; gap: 6px; height: 40px; width: 150px; padding-inline: 12px;
+  border-radius: var(--radius-sm); background: var(--surface-solid); border: 1px solid var(--line-strong); color: var(--ink);
+}
+.manual-input input { width: 100%; min-width: 0; background: transparent; outline: 0; font-size: 15px; color: var(--ink); }
+.manual-input:focus-within { border-color: var(--accent); }
+
+/* The chosen hotel on the map */
+.my-hotel-pin { cursor: pointer; padding: 0; background: none; border: 0; }
+.my-hotel-pin-pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding-inline: 13px; border-radius: 999px;
+  font-family: var(--font-body); font-size: 13.5px; font-weight: 700; white-space: nowrap;
+  color: var(--on-accent); background: var(--accent); border: 2px solid var(--surface-solid);
+  box-shadow: 0 0 0 2px var(--accent), 0 4px 14px rgb(0 0 0 / 0.35);
+}
 
 /* Booking prompt for stays */
 .stay-cta {
@@ -718,6 +812,7 @@ a.provider-credit { text-decoration: underline; text-underline-offset: 2px; }
 
 /* Stay pins: listing-style pills with the price or rating on them */
 .stay-pin { cursor: pointer; padding: 0; background: none; border: 0; }
+.stay-pin.priced { z-index: 1; }
 .stay-pin-pill {
   display: inline-flex; align-items: center; justify-content: center; gap: 3px;
   min-width: 34px; height: 30px; padding-inline: 11px; border-radius: 999px;

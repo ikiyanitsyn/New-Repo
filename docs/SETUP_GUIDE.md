@@ -111,6 +111,8 @@ SERPAPI_MONTHLY_LIMIT=200
 
 Docs: <https://serpapi.com/google-flights-api>
 
+The same key and the same monthly limit also power the hotel prices in the city guide (section 8). Flights and hotels share one count.
+
 ---
 
 ## 4. Google AI Studio: Gemini API key (used from Phase 3)
@@ -244,6 +246,23 @@ You should get back JSON with a name, a rating and a count. This uses one of you
 Pricing and free caps: <https://developers.google.com/maps/billing-and-pricing/pricing> · Usage and billing: <https://developers.google.com/maps/documentation/places/web-service/usage-and-billing>
 
 ---
+
+## 8. City guide: live hotel prices, satellite map, My hotel
+
+**Live hotel prices** need nothing new: they use the SerpApi key from section 3 (Google Hotels engine). In a city's **Stay** tab press **Show live prices**. Each press spends one SerpApi search, never automatically, and the answer is kept for 12 hours (on the server and in your browser), so reopening a city costs nothing. Without a key the Stay tab says *Live prices need a SerpApi key* and works as before.
+
+Prices are per night in US dollars, the lowest all-in price Google Hotels shows for your dates and guests. They change often, so Booking.com stays the main button for the real price.
+
+Docs: <https://serpapi.com/google-hotels-api>
+
+**Satellite map** needs no key. It uses Sentinel-2 cloudless imagery by EOX (licence CC BY-NC-SA 4.0: free for personal, non-commercial use with credit, which the map shows). It is soft close up, because each pixel is 10 metres. For sharper imagery with street names, add a free MapTiler key (their free plan is for non-commercial use):
+
+1. Sign up at <https://www.maptiler.com/cloud/> and copy a key.
+2. Add it to your settings as `NEXT_PUBLIC_MAPTILER_KEY=paste-your-key-here`, then rebuild the site (this one is read when the site is built).
+
+The Street / Satellite choice is remembered in your browser. If the app ever earns money, ask EOX for a commercial licence or use a paid MapTiler plan.
+
+**My hotel** is saved with your trip. A hotel with a live price saves that price (source Google Hotels, with the time it was checked). For other hotels you can type the price you found.
 
 ## Staying-free checklist
 
