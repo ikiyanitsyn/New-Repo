@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "currency": "usd",
+  "data": {
+    "2027-01": { "origin": "NYC", "destination": "BJS", "price": 640, "airline": "CA", "transfers": 0, "departure_at": "2027-01-14T13:00:00-05:00", "return_at": "2027-01-28T16:00:00+08:00", "link": "/search/NYC1401BJS28011" },
+    "2027-02": { "origin": "NYC", "destination": "BJS", "price": 720, "airline": "CA", "transfers": 0, "departure_at": "2027-02-02T13:00:00-05:00", "link": "/search/NYC0202BJS1" },
+    "2027-03": { "origin": "NYC", "destination": "BJS", "price": 690, "airline": "UA", "transfers": 1, "departure_at": "2027-03-10T11:20:00-05:00" },
+    "2027-04": { "origin": "NYC", "destination": "BJS", "price": 612, "airline": "CA", "transfers": 0, "departure_at": "2027-04-08T13:00:00-05:00", "link": "/search/NYC0804BJS1" },
+    "2027-05": { "origin": "NYC", "destination": "BJS", "price": 705, "airline": "HU", "transfers": 0, "departure_at": "2027-05-19T12:00:00-04:00" },
+    "2027-06": { "origin": "NYC", "destination": "BJS", "price": 860, "airline": "CA", "transfers": 0, "departure_at": "2027-06-21T13:00:00-04:00" },
+    "2027-07": { "origin": "NYC", "destination": "BJS", "price": 940, "airline": "CA", "transfers": 0, "departure_at": "2027-07-02T13:00:00-04:00" },
+    "2027-08": { "origin": "NYC", "destination": "BJS", "price": 910, "airline": "CA", "transfers": 0, "departure_at": "2027-08-09T13:00:00-04:00" },
+    "2027-09": { "origin": "NYC", "destination": "BJS", "price": 700, "airline": "CA", "transfers": 0, "departure_at": "2027-09-15T13:00:00-04:00" },
+    "2027-10": { "origin": "NYC", "destination": "BJS", "price": 760, "airline": "CA", "transfers": 0, "departure_at": "2027-10-11T13:00:00-04:00" },
+    "2027-11": { "origin": "NYC", "destination": "BJS", "price": 655, "airline": "CA", "transfers": 0, "departure_at": "2027-11-04T13:00:00-04:00" },
+    "2027-12": { "origin": "NYC", "destination": "BJS", "price": 900, "airline": "CA", "transfers": 0, "departure_at": "2027-12-20T13:00:00-05:00" }
+  }
+}

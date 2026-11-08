@@ -1,0 +1,9 @@
+{
+  "search_parameters": { "engine": "google_travel_explore", "hl": "en", "gl": "us", "departure_id": "JFK,EWR,LGA", "currency": "USD" },
+  "destinations": [
+    { "destination_id": "/m/0947l", "name": "Tokyo", "country": "Japan", "destination_airport": { "code": "HND" }, "start_date": "2027-04-08", "end_date": "2027-04-15", "flight_price": 788, "hotel_price": 160, "flight_duration": 845, "number_of_stops": 0, "airline": "ANA", "airline_code": "NH", "link": "https://www.google.com/travel/explore?tfs=abc" },
+    { "destination_id": "/m/01914", "name": "Seoul", "country": "South Korea", "destination_airport": { "code": "ICN" }, "start_date": "2027-04-09", "end_date": "2027-04-16", "flight_price": 702, "flight_duration": 870, "number_of_stops": 0, "airline": "Korean Air", "link": "https://www.google.com/travel/explore?tfs=def" },
+    { "destination_id": "/m/0x", "name": "Ulaanbaatar", "country": "Mongolia", "destination_airport": { "code": "UBN" }, "start_date": "2027-04-10", "end_date": "2027-04-17", "flight_price": 1104, "number_of_stops": 1, "airline": "MIAT" },
+    { "destination_id": "/m/0y", "name": "No price", "country": "Nowhere", "destination_airport": { "code": "NOP" } }
+  ]
+}

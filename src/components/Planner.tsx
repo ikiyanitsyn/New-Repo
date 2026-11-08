@@ -114,11 +114,17 @@ export function Planner() {
   const conciergeOpen = hash === "#concierge";
   const tripsTab = hash === "#trips" ? "mine" : hash === "#shared" ? "shared" : null;
   const shareOpen = hash === "#share";
-  // The opening page: #start, or a first visit with nothing else asked for.
-  const landingOpen = hash === "#start" || (!started && !conciergeOpen && !exploreStopId && !tripsTab && !shareOpen);
+  // Home (the search) is the default view: "" or "#start". The planner lives at "#trip".
+  const landingOpen = hash === "" || hash === "#start";
   const openExplorer = (stopId: string) => { window.location.hash = `explore-${stopId}`; };
   const openConcierge = () => { setStarted(true); window.location.hash = "concierge"; };
-  const showPlanner = () => { setStarted(true); setSelectedLegId("outbound"); replaceHash(""); };
+  // From home, push "#trip" so Back returns to the search; elsewhere, replace.
+  const showPlanner = () => {
+    setStarted(true);
+    setSelectedLegId("outbound");
+    if (landingOpen) window.location.hash = "trip";
+    else replaceHash("#trip");
+  };
   const openCityFromPlan = (cityCode: string) => {
     const stop = datedStops.find((s) => s.city === cityCode);
     if (stop) replaceHash(`#explore-${stop.id}`);
@@ -128,7 +134,7 @@ export function Planner() {
     const stop = datedStops.find((s) => s.city === cityCode);
     if (stop) replaceHash(`#explore-${stop.id}~${encodeURIComponent(placeName)}`);
   };
-  const closeExplorer = () => replaceHash("");
+  const closeExplorer = () => replaceHash("#trip");
   // A brand-new trip (or the example) must not overwrite the trip saved in the account.
   const startFresh = () => { sync.unlink(); showPlanner(); };
   const openTrips = (tab: "mine" | "shared") => { window.location.hash = tab === "mine" ? "trips" : "shared"; };
@@ -172,7 +178,17 @@ export function Planner() {
       </header>
 
       {landingOpen ? (
-        <Landing trip={trip} dispatch={dispatch} hasSavedTrip={started} onPlan={startFresh} onContinue={showPlanner} onConcierge={() => { sync.unlink(); openConcierge(); }} />
+        <Landing
+          trip={trip}
+          dispatch={dispatch}
+          hasSavedTrip={started}
+          onPlan={startFresh}
+          onContinue={showPlanner}
+          onConcierge={() => { sync.unlink(); openConcierge(); }}
+          userId={auth.configured ? auth.userId : null}
+          linkedTripId={sync.link?.tripId}
+          onOpenTrip={(t) => { sync.openTrip(t); showPlanner(); }}
+        />
       ) : (
       <main className="stage" data-globe={globeHidden ? "hidden" : "shown"} data-fares={faresCollapsed ? "collapsed" : "open"}>
         <Globe home={home} stops={globeStops} legs={legs} selectedLegId={activeLegId} onSelectLeg={setSelectedLegId} onOpenStop={openExplorer} hidden={globeHidden} />
