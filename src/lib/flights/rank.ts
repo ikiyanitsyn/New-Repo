@@ -2,6 +2,9 @@ import type { FlightOffer } from "./types";
 
 export type SortMode = "best" | "cheapest" | "fastest";
 
+/** "Best" weighs price and time evenly (with a small penalty per stop). There is no slider. */
+export const BEST_PRICE_WEIGHT = 0.5;
+
 /** An offer is on the frontier if no other offer is both cheaper-or-equal and faster-or-equal (and strictly better in one). */
 export function paretoIds(offers: FlightOffer[]): Set<string> {
   const ids = new Set<string>();
@@ -33,7 +36,7 @@ export function balanceScore(o: FlightOffer, offers: FlightOffer[], priceWeight:
   return priceWeight * norm(o.priceTotal, prices) + (1 - priceWeight) * norm(o.durationMin, durs) + 0.03 * o.stops;
 }
 
-export function sortOffers(offers: FlightOffer[], mode: SortMode, priceWeight = 0.5): FlightOffer[] {
+export function sortOffers(offers: FlightOffer[], mode: SortMode, priceWeight = BEST_PRICE_WEIGHT): FlightOffer[] {
   const list = [...offers];
   if (mode === "cheapest") return list.sort((a, b) => a.priceTotal - b.priceTotal || a.durationMin - b.durationMin);
   if (mode === "fastest") return list.sort((a, b) => a.durationMin - b.durationMin || a.priceTotal - b.priceTotal);

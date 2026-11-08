@@ -18,6 +18,8 @@ import { Concierge } from "./Concierge";
 import { PlusIcon, SparkIcon } from "./icons";
 import { Landing } from "./Landing";
 import { LegPanel } from "./LegPanel";
+import { nextLegNeedingFlight } from "@/lib/flights/nextLeg";
+import { usePersistedFlag } from "./planner/usePersistedFlag";
 import { ThemeToggle } from "./ThemeToggle";
 import { TripBuilder } from "./TripBuilder";
 
@@ -72,9 +74,15 @@ export function Planner() {
   const auth = useAuth();
   const sync = useTripSync(trip, dispatch, auth, started);
 
+  // Planning-screen layout choices, remembered on this device.
+  const [globeHidden, setGlobeHidden] = usePersistedFlag("in:planner:globe-hidden");
+  const [faresCollapsed, setFaresCollapsed] = usePersistedFlag("in:planner:fares-collapsed");
+
   // On phones the fares panel sits below the itinerary, so bring it into view.
   const selectLeg = (id: string) => {
     setSelectedLegId(id);
+    setFaresCollapsed(false); // asking for a leg's fares opens the panel again
+
     if (window.matchMedia("(max-width: 860px)").matches) {
       requestAnimationFrame(() => document.getElementById("leg-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }));
     }
@@ -84,6 +92,12 @@ export function Planner() {
   // If the selected leg disappears (stop removed or reordered), fall back to the first leg.
   const activeLegId = legs.some((l) => l.id === selectedLegId) ? selectedLegId : (legs[0]?.id ?? null);
   const selectedLeg = legs.find((l) => l.id === activeLegId);
+  // After a fare is chosen: open the next leg that still needs a flight (outbound, between cities, return).
+  const goToNextFlightLeg = (fromLegId: string) => {
+    const next = nextLegNeedingFlight(legs, trip.picks, fromLegId);
+    if (next) selectLeg(next);
+    return next !== null;
+  };
   const home = getCity(trip.home);
   const datedStops = useMemo(() => stopsWithDates(trip), [trip]);
   const globeStops = useMemo(() => datedStops.map((s, i) => ({ id: s.id, city: s.cityInfo, label: String(i + 1) })), [datedStops]);
@@ -155,8 +169,13 @@ export function Planner() {
       {landingOpen ? (
         <Landing trip={trip} dispatch={dispatch} hasSavedTrip={started} onPlan={startFresh} onContinue={showPlanner} onConcierge={() => { sync.unlink(); openConcierge(); }} />
       ) : (
-      <main className="stage">
-        <Globe home={home} stops={globeStops} legs={legs} selectedLegId={activeLegId} onSelectLeg={setSelectedLegId} onOpenStop={openExplorer} />
+      <main className="stage" data-globe={globeHidden ? "hidden" : "shown"} data-fares={faresCollapsed ? "collapsed" : "open"}>
+        <Globe home={home} stops={globeStops} legs={legs} selectedLegId={activeLegId} onSelectLeg={setSelectedLegId} onOpenStop={openExplorer} hidden={globeHidden} />
+        <div className="stage-tools">
+          <button type="button" className="btn !h-8 !text-[12.5px]" onClick={() => setGlobeHidden(!globeHidden)} aria-pressed={globeHidden}>
+            {globeHidden ? "Show globe" : "Hide globe"}
+          </button>
+        </div>
         <div className="stage-panels">
           <TripBuilder trip={trip} dispatch={dispatch} legs={legs} selectedLegId={activeLegId} onSelectLeg={selectLeg} onExplore={openExplorer} onConcierge={openConcierge} />
           <LegPanel
@@ -164,6 +183,11 @@ export function Planner() {
             trip={trip}
             onMode={(id, mode) => dispatch({ type: "mode", key: id, mode })}
             onPick={(legId, pick) => dispatch({ type: "pick", legId, pick })}
+            onDate={(date) => dispatch({ type: "date", date })}
+            onNextLeg={goToNextFlightLeg}
+            collapsed={faresCollapsed}
+            onCollapse={() => setFaresCollapsed(true)}
+            onExpand={() => setFaresCollapsed(false)}
           />
         </div>
         {exploreStopId && (

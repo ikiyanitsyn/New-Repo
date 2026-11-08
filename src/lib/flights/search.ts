@@ -25,7 +25,9 @@ function liveQuota() {
   return { used: liveUsage.used, limit: liveLimit() };
 }
 
-const key = (mode: string, q: FlightQuery) => [mode, q.from, q.to, q.date, q.adults, q.cabin, q.directOnly].join("|");
+// Stops and layover preferences only change live (SerpApi) searches, so they only belong in the live key.
+const key = (mode: string, q: FlightQuery) =>
+  [mode, q.from, q.to, q.date, q.adults, q.cabin, q.directOnly, mode === "live" ? JSON.stringify(q.filter ?? null) : ""].join("|");
 
 export async function searchFlights(q: FlightQuery, mode: "cached" | "live"): Promise<FlightSearchResult> {
   const k = key(mode, q);

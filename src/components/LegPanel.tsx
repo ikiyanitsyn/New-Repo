@@ -1,40 +1,98 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { estimateLeg, MODES, type Mode } from "@/lib/ground";
 import { formatDuration, formatMiles, formatUsd } from "@/lib/geo";
 import { fmtDay } from "@/lib/format";
 import type { FlightPick, Leg, Trip } from "@/lib/trip";
 import { FlightResults } from "./FlightResults";
 import { ExternalIcon, MODE_ICON, MODE_LABEL } from "./icons";
+import { CollapseButton } from "./planner/CollapseButton";
 
 interface Props {
   leg: Leg | undefined;
   trip: Trip;
   onMode: (legId: string, mode: Mode) => void;
   onPick: (legId: string, pick: FlightPick | null) => void;
+  /** Move the trip's departure date (price strip on the outbound flight). */
+  onDate?: (date: string) => void;
+  /** After a fare is chosen: go to the next leg that needs a flight. Returns false when none is left. */
+  onNextLeg?: (fromLegId: string) => boolean;
+  collapsed?: boolean;
+  onCollapse?: () => void;
+  onExpand?: () => void;
 }
 
-export function LegPanel({ leg, trip, onMode, onPick }: Props) {
+/** How long the "Added to your trip" note stays, and how long before the next leg opens. */
+const TOAST_MS = 3200;
+const ADVANCE_MS = 1100;
+
+export function LegPanel({ leg, trip, onMode, onPick, onDate, onNextLeg, collapsed = false, onCollapse, onExpand }: Props) {
+  const [toast, setToast] = useState<string | null>(null);
+  const timers = useRef<number[]>([]);
+  const nextRef = useRef(onNextLeg);
+  useEffect(() => {
+    nextRef.current = onNextLeg;
+  });
+  useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
+
+  const choose = (legId: string, pick: FlightPick | null) => {
+    onPick(legId, pick);
+    if (!pick) return;
+    timers.current.forEach((t) => window.clearTimeout(t));
+    setToast(`Added to your trip \u00b7 ${formatUsd(pick.priceTotal)}`);
+    timers.current = [
+      window.setTimeout(() => {
+        const moved = nextRef.current?.(legId);
+        if (moved === false) setToast((t) => (t ? `${t} \u00b7 all flights chosen` : t));
+      }, ADVANCE_MS),
+      window.setTimeout(() => setToast(null), TOAST_MS),
+    ];
+  };
+
   return (
-    <section id="leg-panel" className="panel results scroll-mt-4" aria-label="Leg details">
-      {!leg ? (
-        <div className="flex flex-col gap-2 px-5 py-6">
-          <span className="eyebrow">Fares and transfers</span>
-          <p className="text-[14px] text-ink-2">Choose a flight or a leg between cities to compare options.</p>
-        </div>
-      ) : leg.mode === "flight" ? (
-        <>
-          {leg.kind === "between" && <ModeCompare leg={leg} adults={trip.adults} onMode={(m) => onMode(leg.id, m)} compact />}
-          <FlightResults key={`${leg.id}|${leg.from.code}|${leg.to.code}|${leg.date}|${trip.adults}|${trip.cabin}`} leg={leg} trip={trip} pick={trip.picks?.[leg.id]} onPick={(p) => onPick(leg.id, p)} />
-        </>
-      ) : (
-        <GroundDetail leg={leg} adults={trip.adults} onMode={(m) => onMode(leg.id, m)} />
+    <>
+      <section id="leg-panel" className="panel results scroll-mt-4" aria-label="Leg details" data-collapsed={collapsed}>
+        {!leg ? (
+          <div className="flex flex-col gap-2 px-5 py-6">
+            <div className="flex items-center justify-between gap-2">
+              <span className="eyebrow">Fares and transfers</span>
+              {onCollapse && <CollapseButton onClick={onCollapse} />}
+            </div>
+            <p className="text-[14px] text-ink-2">Choose a flight or a leg between cities to compare options.</p>
+          </div>
+        ) : leg.mode === "flight" ? (
+          <>
+            {leg.kind === "between" && <ModeCompare leg={leg} adults={trip.adults} onMode={(m) => onMode(leg.id, m)} compact />}
+            <FlightResults
+              key={`${leg.id}|${leg.from.code}|${leg.to.code}|${leg.date}|${trip.adults}|${trip.cabin}`}
+              leg={leg}
+              trip={trip}
+              pick={trip.picks?.[leg.id]}
+              onPick={(p) => choose(leg.id, p)}
+              onPickDate={onDate}
+              onCollapse={onCollapse}
+            />
+          </>
+        ) : (
+          <GroundDetail leg={leg} adults={trip.adults} onMode={(m) => onMode(leg.id, m)} onCollapse={onCollapse} />
+        )}
+        {toast && (
+          <div role="status" className="results-toast">
+            {toast}
+          </div>
+        )}
+      </section>
+      {collapsed && (
+        <button type="button" className="results-tab" onClick={onExpand} aria-label="Show fares and transfers" title="Show fares">
+          <span className="results-tab-label">Fares</span>
+        </button>
       )}
-    </section>
+    </>
   );
 }
 
-function GroundDetail({ leg, adults, onMode }: { leg: Leg; adults: number; onMode: (m: Mode) => void }) {
+function GroundDetail({ leg, adults, onMode, onCollapse }: { leg: Leg; adults: number; onMode: (m: Mode) => void; onCollapse?: () => void }) {
   const est = estimateLeg(leg.from, leg.to, leg.mode);
   const Icon = MODE_ICON[leg.mode];
   return (
@@ -42,8 +100,11 @@ function GroundDetail({ leg, adults, onMode }: { leg: Leg; adults: number; onMod
       <header className="flex flex-col gap-2 border-b border-line px-5 pb-4 pt-4">
         <div className="flex items-center justify-between gap-2">
           <span className="eyebrow">Between stops</span>
-          <span className={`chip ${est.source === "typical" ? "chip-ground" : "chip-muted"}`}>
-            {est.source === "typical" ? "Typical schedule" : "Estimate"}
+          <span className="flex items-center gap-1.5">
+            <span className={`chip ${est.source === "typical" ? "chip-ground" : "chip-muted"}`}>
+              {est.source === "typical" ? "Typical schedule" : "Estimate"}
+            </span>
+            {onCollapse && <CollapseButton onClick={onCollapse} />}
           </span>
         </div>
         <h2 className="display text-[26px] leading-tight">

@@ -103,3 +103,23 @@ export async function travelpayoutsSearch(
   if (q.adults > 1) notices.push(`Totals are the per-person fare × ${q.adults}.`);
   return { offers: offers.filter((o) => o.durationMin > 0), notices };
 }
+
+/**
+ * Every cached fare for a route in one month (`departure_at=YYYY-MM`, up to 1000 results),
+ * used to find the lowest price on each day for the price strip.
+ * Prices are per person, economy, USD.
+ */
+export async function travelpayoutsMonth(origin: string, destination: string, month: string, token: string): Promise<{ departure_at: string; price: number }[]> {
+  const params = new URLSearchParams({
+    origin, destination, departure_at: month, one_way: "true", direct: "false", currency: "usd",
+    sorting: "price", unique: "false", limit: "1000", page: "1",
+  });
+  const res = await fetch(`https://api.travelpayouts.com/aviasales/v3/prices_for_dates?${params}`, {
+    headers: { "X-Access-Token": token, "Accept-Encoding": "gzip" },
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) throw new Error(`Travelpayouts responded ${res.status}`);
+  const json = (await res.json()) as TpResponse;
+  if (!json.success) throw new Error(json.error || "Travelpayouts returned an error");
+  return (json.data ?? []).map((it) => ({ departure_at: it.departure_at, price: it.price }));
+}

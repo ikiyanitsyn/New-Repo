@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Map as MLMap, Marker, GeoJSONSource, StyleSpecification, SkySpecification } from "maplibre-gl";
 import type { Feature, FeatureCollection, Geometry, LineString, Point } from "geojson";
 import type { Leg } from "@/lib/trip";
@@ -20,6 +20,8 @@ interface Props {
   selectedLegId: string | null;
   onSelectLeg: (id: string) => void;
   onOpenStop: (stopId: string) => void;
+  /** Hidden by the Hide globe button. The map stays mounted, so showing it again is quick. */
+  hidden?: boolean;
 }
 
 const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -263,7 +265,7 @@ function updateVisibility(map: MLMap, placed: Placed[], LngLatCtor: typeof impor
   }
 }
 
-export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, onOpenStop }: Props) {
+export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, onOpenStop, hidden = false }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const placed = useRef<Placed[]>([]);
@@ -274,9 +276,16 @@ export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, o
   onOpenRef.current = onOpenStop;
   const latest = useRef({ home, stops, legs, selectedLegId });
   latest.current = { home, stops, legs, selectedLegId };
+  const hiddenRef = useRef(hidden);
+  hiddenRef.current = hidden;
+
+  // The map is created the first time it is shown (a hidden box has no size to draw into).
+  const [activated, setActivated] = useState(!hidden);
+  if (!hidden && !activated) setActivated(true);
 
   // Create the map once.
   useEffect(() => {
+    if (!activated) return;
     let cancelled = false;
     let cleanup = () => {};
     (async () => {
@@ -327,7 +336,14 @@ export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, o
       const mq = window.matchMedia("(prefers-color-scheme: dark)");
       window.addEventListener("in:themechange", onTheme);
       mq.addEventListener("change", onTheme);
+      // Keep the canvas sized to its box: window resizes, the panels changing width, the globe being shown again.
+      const box = container.current;
+      const observer = new ResizeObserver(() => {
+        if (box.clientWidth > 0 && box.clientHeight > 0) map.resize();
+      });
+      observer.observe(box);
       cleanup = () => {
+        observer.disconnect();
         window.removeEventListener("in:themechange", onTheme);
         mq.removeEventListener("change", onTheme);
         map.remove();
@@ -339,7 +355,7 @@ export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, o
       cleanup();
       mapRef.current = null;
     };
-  }, []);
+  }, [activated]);
 
   function sync(map: MLMap, ml: typeof import("maplibre-gl"), fit: boolean) {
     const { home, stops, legs, selectedLegId } = latest.current;
@@ -378,21 +394,29 @@ export default function Globe({ home, stops, legs, selectedLegId, onSelectLeg, o
   const lastStopKey = useRef(stopKey);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready.current) return;
+    if (!map || !ready.current || hiddenRef.current) return;
     const fit = lastStopKey.current !== stopKey;
     lastStopKey.current = stopKey;
     import("maplibre-gl").then((ml) => sync(map, ml.default, fit));
   }, [stopKey, legKey, selectedLegId]);
 
+  // Shown again after being hidden: resize, then bring routes and framing up to date.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (hidden || !map || !ready.current) return;
+    map.resize();
+    import("maplibre-gl").then((ml) => sync(map, ml.default, true));
+  }, [hidden]);
+
   // Fly to the selected leg.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready.current || !selectedLegId) return;
+    if (!map || !ready.current || hiddenRef.current || !selectedLegId) return;
     const leg = legs.find((l) => l.id === selectedLegId);
     if (!leg) return;
     frame(map, [leg.from, leg.to], 1400);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLegId]);
 
-  return <div ref={container} className="globe" role="region" aria-label="Route globe. Drag to rotate, scroll to zoom." />;
+  return <div ref={container} className="globe" hidden={hidden} role="region" aria-label="Route globe. Drag to rotate, scroll to zoom." />;
 }

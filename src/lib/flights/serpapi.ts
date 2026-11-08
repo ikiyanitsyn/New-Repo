@@ -1,4 +1,6 @@
 import { getCity } from "../cities";
+import { parseBags } from "./bags";
+import { NO_LAYOVER_FILTER, serpLayoverParams } from "./layover";
 import type { FlightOffer, FlightQuery } from "./types";
 
 /**
@@ -15,6 +17,7 @@ interface SerpSegment {
   duration: number;
   airline: string;
   flight_number?: string;
+  travel_class?: string;
 }
 interface SerpItinerary {
   flights: SerpSegment[];
@@ -22,6 +25,8 @@ interface SerpItinerary {
   total_duration: number;
   price?: number;
   booking_token?: string;
+  /** Fare notes Google shows, e.g. "Checked baggage for a fee". */
+  extensions?: string[];
 }
 interface SerpResponse {
   best_flights?: SerpItinerary[];
@@ -51,6 +56,9 @@ export async function serpapiSearch(q: FlightQuery, apiKey: string): Promise<{ o
     api_key: apiKey,
   });
   if (q.directOnly) params.set("stops", "1"); // 1 = nonstop only
+  // Stops (1 nonstop, 2 one or fewer) and layover_duration ("min,max" minutes). SerpApi can only
+  // exclude connecting airports (exclude_conns), so preferred airports are applied client-side.
+  for (const [k, v] of Object.entries(serpLayoverParams(q.filter ?? NO_LAYOVER_FILTER))) params.set(k, v);
 
   const res = await fetch(`https://serpapi.com/search.json?${params}`, { signal: AbortSignal.timeout(25000) });
   const json = (await res.json()) as SerpResponse;
@@ -85,6 +93,9 @@ export async function serpapiSearch(q: FlightQuery, apiKey: string): Promise<{ o
         durationMin: s.duration,
       })),
       bookingUrl: gfUrl,
+      // Only what Google Flights actually says; no extension about bags means "unknown".
+      bags: parseBags(it.extensions),
+      fareText: [...it.flights.map((s) => s.travel_class ?? ""), ...(it.extensions ?? [])].filter(Boolean),
     };
   });
   return { offers, notices: [] };

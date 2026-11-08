@@ -1,19 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { filterOffers, paretoIds, sortOffers, type SortMode } from "@/lib/flights/rank";
-import type { FlightOffer, FlightSearchResult } from "@/lib/flights/types";
+import { applyLayoverFilter, connectionAirports, isDefaultFilter, NO_LAYOVER_FILTER, type LayoverFilter } from "@/lib/flights/layover";
+import { BEST_PRICE_WEIGHT, paretoIds, sortOffers, type SortMode } from "@/lib/flights/rank";
+import type { Cabin, FlightOffer, FlightSearchResult } from "@/lib/flights/types";
 import { formatDuration, formatMiles, formatUsd } from "@/lib/geo";
 import { dayDiff, fmtDay, fmtTime } from "@/lib/format";
 import type { FlightPick, Leg, Trip } from "@/lib/trip";
 import { BoltIcon, ExternalIcon, PlaneIcon } from "./icons";
 import { SplitFlap } from "./SplitFlap";
+import { CollapseButton } from "./planner/CollapseButton";
+import { FareDetails } from "./planner/FareDetails";
+import { LayoverControls } from "./planner/LayoverControls";
+import { PriceStrip } from "./planner/PriceStrip";
 
 interface Props {
   leg: Leg;
   trip: Trip;
   pick?: FlightPick;
   onPick: (pick: FlightPick | null) => void;
+  /** Move the trip's departure date (outbound flight only). */
+  onPickDate?: (date: string) => void;
+  onCollapse?: () => void;
 }
 
 const SOURCE_LABEL: Record<FlightSearchResult["source"], { text: string; cls: string; detail: string }> = {
@@ -22,15 +30,17 @@ const SOURCE_LABEL: Record<FlightSearchResult["source"], { text: string; cls: st
   serpapi: { text: "Live · Google Flights", cls: "chip-accent", detail: "Checked just now." },
 };
 
-export function FlightResults({ leg, trip, pick, onPick }: Props) {
+export function FlightResults({ leg, trip, pick, onPick, onPickDate, onCollapse }: Props) {
   const [sort, setSort] = useState<SortMode>("best");
-  const [directOnly, setDirectOnly] = useState(false);
-  const [weight, setWeight] = useState(50);
-  const [live, setLive] = useState(false);
+  const [filter, setFilter] = useState<LayoverFilter>(NO_LAYOVER_FILTER);
+  // Pressing "Check live prices" sends the stops and layover choices of that moment to SerpApi.
+  // Later changes filter the results in the browser, so they never spend another live search.
+  const [live, setLive] = useState<LayoverFilter | null>(null);
   // The parent remounts this component when the route, date or travellers change.
   const params = new URLSearchParams({
     from: leg.from.code, to: leg.to.code, date: leg.date,
     adults: String(trip.adults), cabin: trip.cabin, mode: live ? "live" : "cached",
+    ...(live ? { stops: live.maxStops === null ? "any" : String(live.maxStops), ...(live.minHours !== null ? { layMin: String(live.minHours) } : {}), ...(live.maxHours !== null ? { layMax: String(live.maxHours) } : {}) } : {}),
   }).toString();
   const [state, setState] = useState<{ key: string; data?: FlightSearchResult; error?: string } | null>(null);
   const loading = state?.key !== params;
@@ -51,20 +61,24 @@ export function FlightResults({ leg, trip, pick, onPick }: Props) {
     return () => ctrl.abort();
   }, [params]);
 
-  const offers = useMemo(() => filterOffers(data?.offers ?? [], directOnly), [data, directOnly]);
-  const sorted = useMemo(() => sortOffers(offers, sort, weight / 100), [offers, sort, weight]);
+  const offers = useMemo(() => applyLayoverFilter(data?.offers ?? [], filter), [data, filter]);
+  const airports = useMemo(() => connectionAirports(data?.offers ?? []), [data]);
+  const sorted = useMemo(() => sortOffers(offers, sort, BEST_PRICE_WEIGHT), [offers, sort]);
   const frontier = useMemo(() => paretoIds(offers), [offers]);
   const cheapest = sorted.length ? Math.min(...offers.map((o) => o.priceTotal)) : 0;
   const fastest = sorted.length ? Math.min(...offers.map((o) => o.durationMin)) : 0;
-  const hasDirect = (data?.offers ?? []).some((o) => o.stops === 0);
   const source = data ? SOURCE_LABEL[data.source] : null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <div className="scroll-y flex min-h-0 flex-1 flex-col">
       <header className="flex flex-col gap-3 border-b border-line px-5 pb-4 pt-4">
         <div className="flex items-center justify-between gap-2">
           <span className="eyebrow">{leg.kind === "outbound" ? "Outbound flight" : leg.kind === "return" ? "Return flight" : "Flight between stops"}</span>
-          {source && <span className={`chip ${source.cls}`} title={source.detail}>{source.text}</span>}
+          <span className="flex items-center gap-1.5">
+            {source && <span className={`chip ${source.cls}`} title={source.detail}>{source.text}</span>}
+            {onCollapse && <CollapseButton onClick={onCollapse} />}
+          </span>
         </div>
         <div className="flex items-center gap-2.5" aria-hidden>
           <SplitFlap value={leg.from.code} size="lg" tone="brass" />
@@ -78,44 +92,27 @@ export function FlightResults({ leg, trip, pick, onPick }: Props) {
           {leg.from.airports.join(" · ")} → {leg.to.airports.join(" · ")} · {fmtDay(leg.date)} · {formatMiles(leg.distanceKm)}
         </p>
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="segmented" role="tablist" aria-label="Sort fares">
-            {(["best", "cheapest", "fastest"] as SortMode[]).map((m) => (
-              <button key={m} type="button" role="tab" aria-selected={sort === m} onClick={() => setSort(m)}>
-                {m === "best" ? "Best" : m === "cheapest" ? "Cheapest" : "Fastest"}
-              </button>
-            ))}
-          </div>
-          <label htmlFor="direct-only" className={`flex items-center gap-2 text-[13px] ${hasDirect || !data ? "" : "text-ink-3"}`}>
-            <input id="direct-only" type="checkbox" className="accent-[var(--accent)]" checked={directOnly} onChange={(e) => setDirectOnly(e.target.checked)} />
-            Nonstop only
-          </label>
-        </div>
+        <PriceStrip
+          from={leg.from.code}
+          to={leg.to.code}
+          date={leg.date}
+          adults={trip.adults}
+          cabin={trip.cabin}
+          editable={leg.kind === "outbound" && Boolean(onPickDate)}
+          onPickDate={(d) => onPickDate?.(d)}
+        />
 
-        {sort === "best" && (
-          <div className="flex flex-col gap-1">
-            <input
-              id="balance"
-              type="range"
-              min={0}
-              max={100}
-              step={5}
-              value={weight}
-              onChange={(e) => setWeight(Number(e.target.value))}
-              className="w-full accent-[var(--accent)]"
-              aria-label="Balance between price and travel time"
-              aria-valuetext={weight > 60 ? "Favour lower price" : weight < 40 ? "Favour shorter time" : "Balanced"}
-            />
-            <div className="flex justify-between text-[11.5px] text-ink-3">
-              <span>Shortest time</span>
-              <span>Balanced</span>
-              <span>Lowest price</span>
-            </div>
-          </div>
-        )}
+        <div className="segmented self-start" role="tablist" aria-label="Sort fares">
+          {(["best", "cheapest", "fastest"] as SortMode[]).map((m) => (
+            <button key={m} type="button" role="tab" aria-selected={sort === m} onClick={() => setSort(m)}>
+              {m === "best" ? "Best" : m === "cheapest" ? "Cheapest" : "Fastest"}
+            </button>
+          ))}
+        </div>
+        <LayoverControls filter={filter} onChange={setFilter} airports={airports} />
       </header>
 
-      <div className="scroll-y flex min-h-0 flex-1 flex-col gap-2 px-3 py-3" aria-live="polite" aria-busy={loading}>
+      <div className="flex flex-col gap-2 px-3 py-3" aria-live="polite" aria-busy={loading}>
         {data?.notices.map((n) => (
           <p key={n} className="mx-2 rounded-md px-3 py-2 text-[12.5px]" style={{ background: "var(--surface-sunk)", color: "var(--ink-2)" }}>{n}</p>
         ))}
@@ -123,7 +120,13 @@ export function FlightResults({ leg, trip, pick, onPick }: Props) {
         {error && <p className="mx-2 text-[13px] text-[var(--bad)]">{error}. Try again in a moment.</p>}
         {!loading && data && sorted.length === 0 && (
           <p className="mx-2 py-6 text-center text-[13.5px] text-ink-2">
-            {directOnly ? "No nonstop flights found for this date. Turn off Nonstop only to see connections." : "No fares found for this date."}
+            {isDefaultFilter(filter) ? "No fares found for this date." : "No fares match your stops and layover choices."}
+            {!isDefaultFilter(filter) && (
+              <>
+                {" "}
+                <button type="button" className="underline underline-offset-2" onClick={() => setFilter(NO_LAYOVER_FILTER)}>Show all fares</button>
+              </>
+            )}
           </p>
         )}
         <ul className={`flex flex-col gap-2 transition-opacity ${loading ? "opacity-50" : ""}`}>
@@ -132,6 +135,7 @@ export function FlightResults({ leg, trip, pick, onPick }: Props) {
               key={o.id}
               offer={o}
               adults={trip.adults}
+              cabin={trip.cabin}
               rankLabel={i === 0 ? (sort === "best" ? "Best balance" : sort === "cheapest" ? "Cheapest" : "Fastest") : null}
               isCheapest={o.priceTotal === cheapest}
               isFastest={o.durationMin === fastest}
@@ -148,6 +152,7 @@ export function FlightResults({ leg, trip, pick, onPick }: Props) {
           ))}
         </ul>
       </div>
+      </div>
 
       <footer className="flex flex-col gap-2 border-t border-line px-5 py-3">
         {data && !live && (
@@ -155,7 +160,7 @@ export function FlightResults({ leg, trip, pick, onPick }: Props) {
             type="button"
             className={`btn w-full ${data.liveAvailable ? "btn-primary" : ""}`}
             disabled={!data.liveAvailable || loading}
-            onClick={() => setLive(true)}
+            onClick={() => setLive(filter)}
             title={data.liveAvailable ? undefined : "Add a SerpApi key to enable live prices"}
           >
             <BoltIcon size={15} />
@@ -178,9 +183,9 @@ export function FlightResults({ leg, trip, pick, onPick }: Props) {
 }
 
 function OfferRow({
-  offer: o, adults, rankLabel, isCheapest, isFastest, onFrontier, chosen, onChoose,
+  offer: o, adults, cabin, rankLabel, isCheapest, isFastest, onFrontier, chosen, onChoose,
 }: {
-  offer: FlightOffer; adults: number; rankLabel: string | null; isCheapest: boolean; isFastest: boolean; onFrontier: boolean; chosen: boolean; onChoose: () => void;
+  offer: FlightOffer; adults: number; cabin: Cabin; rankLabel: string | null; isCheapest: boolean; isFastest: boolean; onFrontier: boolean; chosen: boolean; onChoose: () => void;
 }) {
   const first = o.segments[0];
   const last = o.segments[o.segments.length - 1];
@@ -191,7 +196,7 @@ function OfferRow({
       style={{ borderColor: chosen ? "var(--accent)" : "var(--line)", background: chosen ? "var(--accent-soft)" : "var(--surface-solid)" }}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="truncate text-[13.5px] font-semibold">{o.airlines.join(" + ")}</span>
             {rankLabel && <span className="chip chip-accent">{rankLabel}</span>}
@@ -199,7 +204,7 @@ function OfferRow({
             {!rankLabel && isFastest && <span className="chip chip-muted">Fastest</span>}
             {onFrontier && !rankLabel && !isCheapest && !isFastest && <span className="chip chip-muted" title="Nothing else is both cheaper and faster">Good value</span>}
           </div>
-          <div className="data mt-1.5 flex items-center gap-2 text-[13px]">
+          <div className="data mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px]">
             {/* The top-ranked fare's departure flips in like a board; the rest stay quiet. */}
             {rankLabel ? <SplitFlap value={fmtTime(o.departLocal)} size="sm" delayMs={300} /> : <span>{fmtTime(o.departLocal)}</span>}
             <span className="text-ink-3">{first?.from}</span>
@@ -218,6 +223,7 @@ function OfferRow({
               <span className="text-ink-3"> · {o.layovers.map((l) => `${l.airport} ${formatDuration(l.durationMin)}`).join(", ")}</span>
             )}
           </div>
+          <FareDetails offer={o} cabin={cabin} />
         </div>
         <div className="flex flex-none flex-col items-end gap-1.5">
           <div className="text-right">

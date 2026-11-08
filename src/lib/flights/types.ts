@@ -1,3 +1,6 @@
+import type { BagInfo } from "./bags";
+import type { LayoverFilter } from "./layover";
+
 export type Cabin = "economy" | "premium" | "business" | "first";
 export type FlightSource = "travelpayouts" | "serpapi" | "sample";
 
@@ -25,6 +28,10 @@ export interface FlightOffer {
   layovers: { airport: string; durationMin: number }[];
   segments: FlightSegment[];
   bookingUrl?: string;
+  /** Bag allowances per traveller when the provider says (SerpApi extensions); absent = unknown. */
+  bags?: BagInfo;
+  /** Provider words about the fare (travel class, extensions), used to spot "Basic economy". */
+  fareText?: string[];
 }
 
 export interface FlightQuery {
@@ -34,6 +41,8 @@ export interface FlightQuery {
   adults: number;
   cabin: Cabin;
   directOnly: boolean;
+  /** Stops and layover preferences, sent to SerpApi (live searches) where it supports them. */
+  filter?: LayoverFilter;
 }
 
 export interface FlightSearchResult {
