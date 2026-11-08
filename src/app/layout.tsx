@@ -5,7 +5,10 @@ import "@fontsource-variable/instrument-sans";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "maplibre-gl/dist/maplibre-gl.css";
+import "@fontsource-variable/fraunces/full.css";
+import "@fontsource-variable/manrope";
 import "./globals.css";
+import "./palettes.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
 
 export const metadata: Metadata = {
@@ -26,7 +29,7 @@ export const viewport: Viewport = {
 };
 
 // Applies the saved theme before first paint so there is no flash.
-const themeScript = `(function(){try{var t=localStorage.getItem("in:theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}})()`;
+const themeScript = `(function(){try{var d=document.documentElement,t=localStorage.getItem("in:theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t);var p=localStorage.getItem("in:palette");if(p==="evergreen"||p==="brassnight"||p==="garden")d.setAttribute("data-palette",p);var f=localStorage.getItem("in:font");if(f==="fraunces"||f==="manrope")d.setAttribute("data-font",f)}catch(e){}})()`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

@@ -170,6 +170,19 @@ F2. A tagline? (Currently "Where to next?")
 
 ---
 
+### Step 2 progress (2026-11-08)
+- Your answers: warm and friendly, with colour and motion; mix deep green, darks, brass and light tones; compare all three heading fonts; a photo for every city; more motion.
+- **Style board at `/styles`** (also "Style board" in the top bar):
+  - **Palettes:** Original, plus three new ones (Evergreen, Brass Night, Garden Party), each shown in light and dark.
+  - **Heading fonts:** Bodoni Moda, Fraunces and Manrope.
+  - **Six motion ideas:** departure-board letters, routes that draw themselves, plane across the sky, cards that lift, lists that cascade, slow-moving photos.
+  - **City photo cards.**
+- Choosing a palette or font applies it to the whole app at once (saved on this device). "Reset to original" undoes it.
+- **Next, after your review:**
+  - pick a palette and font (or ask for tweaks);
+  - pick which motion ideas to roll out;
+  - then I build per-city photos everywhere and finish the theme across every screen.
+
 ## Step 3: On your phone
 
 ### Insight: the three ways to get it on a phone

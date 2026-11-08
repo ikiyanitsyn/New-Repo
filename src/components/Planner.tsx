@@ -185,6 +185,7 @@ export function Planner() {
             Reset to example
           </button>
           <PrintButton className="btn btn-ghost hidden md:inline-flex" label="Itinerary" />
+          <Link href="/styles" className="btn btn-ghost hidden xl:inline-flex" title="Compare colours, fonts and motion">Style board</Link>
           <AccountMenu auth={auth} sync={sync} onOpenTrips={openTrips} onShare={() => { window.location.hash = "share"; }} />
           </div>
           <ThemeToggle />
