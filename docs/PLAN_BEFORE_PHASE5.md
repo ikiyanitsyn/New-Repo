@@ -33,6 +33,43 @@ Each step starts with the questions below, then I build in small batches with sc
 1.6 Should the search show a few destination ideas below it (e.g. "Spring in China", "Kyoto & Osaka")? If yes, what kinds: seasonal, by interest, or by budget?
 1.7 Is the concierge ("Let the concierge plan it") a second button on the search, or its own tab/page?
 
+#### Answers: home page (2026-11-08) → draft spec
+- **First view:** always the search page. Your current trip, and recent trips when signed in, show as cards under it.
+- **Trip-type switch:** **One way · Round trip · Multi-city · Stopover**.
+- **Search fields:** From (departure city) · To · Dates (one calendar range, depart → return, nights shown) · Travellers & cabin.
+- **Multi-city:** "+ Add a city" inside the search, with nights for each city.
+- **Flying home:** round trip returns from the city you flew into; multi-city flies home from the last city.
+- **Stopover:** both kinds:
+  - a **planned stopover** trip type (e.g. New York → Reykjavík 2 nights → Paris);
+  - **layover controls** in the fares panel (max stops, layover length, connection airports).
+- **Ideas under the search:**
+  - **seasonal ideas**;
+  - **deals**, both from price analytics (Aviasales cheapest-by-month, popular routes) and from a **live deals search** (Google/SerpApi on demand, cached);
+  - **airline stopover programmes** advertised as options (Icelandair, TAP Portugal, Turkish Airlines, Qatar, Finnair, Singapore Airlines and others), each **linking to the airline's official terms**.
+- **Concierge on the home page:** a "Describe your trip instead" option, plus gentle floating AI suggestion cards that react to the search (to workshop).
+
+#### Answers: planning screen, flights, guide, concierge, itinerary, account, navigation (2026-11-08)
+- **Globe:** stays large for now (colours change in step 2). Add a **Hide globe** button.
+- **Itinerary panel:** a trip summary line (From · dates · travellers · cabin, with Edit opening the search) plus the stops timeline.
+- **Fares panel:** open by default and switches with each leg, with a **collapse** button.
+- **Totals:** a full trip budget: flights + ground + hotels (chosen hotel × nights) + activities, with a per-person figure and a "still to choose" note.
+- **Flights:**
+  - **Drop the slider** and keep the Best / Cheapest / Fastest tabs.
+  - **Choose:** confirm, then move to the next leg that needs a flight.
+  - A **±3-day price strip**.
+  - Each fare shows the airline(s) and alliance, the **fare type** (basic economy / main cabin / premium / business), and **bag icons** (carry-on and checked with a count, crossed out when not included).
+- **City guide:**
+  - **Live hotel prices** for your dates on the Stay cards and as **price pins on the map**.
+  - A **satellite / street** map switch.
+  - **Full-screen map with a sliding list** on desktop.
+  - **My hotel** per city, with the price that was found, flowing into the itinerary and budget.
+- **Concierge:**
+  - **Drag items between days**, delete or add your own items, and **Swap this**.
+  - Prefer **named, rated places**, each linked to its page.
+- **Itinerary / PDF:** closer to your spreadsheet. **Traveller names, confirmation numbers, notes per day, hotel and activity costs**.
+- **Account:** **auto-save** when signed in. **Email link only.**
+- **Phone navigation:** a **bottom tab bar** (Home · Trip · Guide · Concierge · Account).
+
 **2. Planning screen** (globe + itinerary on the left + fares on the right)
 2.1 Is the globe worth its space? Options: keep it large; smaller strip at the top; only as a "Map" toggle.
 2.2 The left itinerary panel: too dense, about right, or too sparse? Which parts would you remove or move (travellers, cabin, leaving-from, dates)? These may move into the search bar per 1.2.
