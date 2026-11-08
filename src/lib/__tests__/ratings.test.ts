@@ -241,3 +241,11 @@ describe("stay pin labels", () => {
     expect(stayPinLabel({ ...p, price: undefined }, r, false)).toBe("$$");
   });
 });
+
+describe("price labels", () => {
+  it("drops trailing punctuation from guide prices", () => {
+    expect(priceShort("Doubles from ¥588, breakfast extra")).toBe("¥588");
+    expect(priceShort("Rooms ¥1,200.")).toBe("¥1,200");
+    expect(priceShort("¥300-450 per night")).toBe("¥300–450");
+  });
+});

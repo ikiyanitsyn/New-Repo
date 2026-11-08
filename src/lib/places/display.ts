@@ -5,7 +5,8 @@ export function priceShort(price: string | undefined): string | undefined {
   if (!price) return undefined;
   const m = price.match(/(?:HK\$|US\$|MOP\$?|NT\$|S\$|RMB\s?|CNY\s?|[¥$€£₩])\s?\d[\d,.]*(?:\s?[-–]\s?\d[\d,.]*)?/i);
   if (!m) return undefined;
-  const out = m[0].replace(/\s?[-–]\s?/, "–").replace(/^(RMB|CNY)\s?/i, "¥").replace(/\s+/g, "");
+  // Drop punctuation the guide text runs on with, e.g. "¥588," or "¥1,200.".
+  const out = m[0].replace(/[,.]+$/, "").replace(/\s?[-–]\s?/, "–").replace(/^(RMB|CNY)\s?/i, "¥").replace(/\s+/g, "");
   return out.length <= 14 ? out : undefined;
 }
 

@@ -927,3 +927,9 @@ a.provider-credit { text-decoration: underline; text-underline-offset: 2px; }
   .wordmark-first { display: none; }
   .wordmark { font-size: 20px; }
 }
+
+/* Phones: keep the map credits clear of the floating List/Map toggle. */
+@media (max-width: 860px) {
+  .explorer .maplibregl-ctrl-bottom-right,
+  .explorer .maplibregl-ctrl-bottom-left { margin-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+}
