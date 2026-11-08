@@ -1,6 +1,6 @@
 import { CITIES, findCity, getCity } from "../cities";
 import { addDays, stopsWithDates, type Trip } from "../trip";
-import { CATEGORY_LABEL, type Place, type PlaceCategory } from "../places/types";
+import { CATEGORY_LABEL, type Place, type PlaceCategory, type PlaceRating } from "../places/types";
 import { featureScore, subcategoryOf } from "../places/subcategory";
 import type { PlanRequest } from "./schema";
 
@@ -89,21 +89,46 @@ export function dayRangeLabel(start: number, count: number): string {
 
 const PER_CATEGORY: Record<PlaceCategory, number> = { see: 14, do: 6, eat: 10, drink: 4, sleep: 6, buy: 3 };
 
-const ranked = (places: Place[], cat: PlaceCategory) =>
-  places.filter((p) => p.category === cat).sort((a, b) => featureScore(b) - featureScore(a));
+/** Ratings by guide place id, as remembered by the server (never fetched for the planner). */
+export type RatingsById = Record<string, Pick<PlaceRating, "rating" | "count"> | null | undefined>;
+
+/** A rating counts as dependable with a decent number of reviews behind it. */
+const solid = (r: RatingsById[string]) => (r && r.rating !== undefined && (r.count === undefined || r.count >= 20) ? r.rating : undefined);
+
+/** Guide order (photos, articles) with a nudge for places known to be well rated. */
+const rankScore = (p: Place, ratings?: RatingsById) => {
+  const r = solid(ratings?.[p.id]);
+  return featureScore(p) + (r === undefined ? 0 : Math.max(0, r - 3.5) * 2); // 4.0 stars +1, 4.5 +2, 5.0 +3
+};
+
+export const rankedPlaces = (places: Place[], cat: PlaceCategory, ratings?: RatingsById) =>
+  places.filter((p) => p.category === cat).sort((a, b) => rankScore(b, ratings) - rankScore(a, ratings));
+
+/** "★4.6 (2,310)" for a place whose rating is known, else "". */
+export function ratingLabel(r: RatingsById[string]): string {
+  if (!r || r.rating === undefined) return "";
+  return `★${r.rating.toFixed(1)}${r.count !== undefined ? ` (${new Intl.NumberFormat("en-US").format(r.count)})` : ""}`;
+}
+
+/** One candidate: "Da Dong [Roast duck, Splurge, ★4.5 (2,310)]". */
+export function candidateLabel(p: Place, ratings?: RatingsById): string {
+  const bits = [subcategoryOf(p), p.tier, ratingLabel(ratings?.[p.id])].filter(Boolean);
+  return `${p.name} [${bits.join(", ")}]`;
+}
 
 /**
  * The guide's best places per category. When a city's days are split across several calls,
  * each part gets its own share (round-robin) so the parts don't plan the same places.
+ * Ratings (when known) are shown and lift well-rated places.
  */
-export function candidateList(places: Place[], part = 0, parts = 1): string {
+export function candidateList(places: Place[], part = 0, parts = 1, ratings?: RatingsById): string {
   const lines: string[] = [];
   for (const cat of Object.keys(PER_CATEGORY) as PlaceCategory[]) {
-    const top = ranked(places, cat)
+    const top = rankedPlaces(places, cat, ratings)
       .slice(0, PER_CATEGORY[cat] * Math.min(parts, 3))
       .filter((_, i) => i % parts === part)
       .slice(0, PER_CATEGORY[cat]);
-    if (top.length) lines.push(`  ${CATEGORY_LABEL[cat]}: ${top.map((p) => `${p.name} [${subcategoryOf(p)}${p.tier ? `, ${p.tier}` : ""}]`).join("; ")}`);
+    if (top.length) lines.push(`  ${CATEGORY_LABEL[cat]}: ${top.map((p) => candidateLabel(p, ratings)).join("; ")}`);
   }
   return lines.join("\n");
 }
@@ -168,7 +193,12 @@ ${saved || "(none)"}`;
 }
 
 /** A day-plan call for one chunk of consecutive days in one city. */
-export function buildDaysPrompt(r: PlanRequest, chunk: SlotChunk, placesByCity: Record<string, Place[]>): { system: string; user: string } {
+export function buildDaysPrompt(
+  r: PlanRequest,
+  chunk: SlotChunk,
+  placesByCity: Record<string, Place[]>,
+  ratings: RatingsById = {},
+): { system: string; user: string } {
   const system = `${VOICE}
 
 Respond with ONE JSON object only, matching this shape exactly:
@@ -178,7 +208,9 @@ Rules:
 - Return exactly one "days" entry per day slot given, same date and city, in order. Up to 5 items per day.
 - Keep every "note" to 1-2 short sentences. Keep titles short.
 - Arrival and travel days are lighter. Include a "travel" item for each transfer with the mode and rough duration.
-- Prefer places from the candidate list, using their exact names in "placeName". You may add famous landmarks that are not listed. Never invent a business name; if unsure, describe it generically (e.g. "a family-run noodle shop near the Drum Tower").
+- Name real places. Every meal ("eat"), drink and sight should be a specific place from the candidate list whenever one fits: put its exact name, copied character for character, in "placeName" and use the name in the title (e.g. "Dinner at Da Dong"). Where ratings (★) are shown, prefer the higher-rated places, especially for meals.
+- Use a generic description with no "placeName" only when nothing in the list fits. You may add a famous landmark that is not listed, but never invent a business name.
+- Do not use the same place twice in the plan.
 - Include the traveller's saved places listed below on suitable days.
 - Group nearby sights on the same day; avoid crossing the city twice.`;
 
@@ -188,7 +220,7 @@ Rules:
   const saved = savedAll.filter((_, i) => i % chunk.parts === chunk.part);
   let others = "";
   if (chunk.parts > 1) {
-    const elsewhere = ranked(places, "see")
+    const elsewhere = rankedPlaces(places, "see", ratings)
       .slice(0, PER_CATEGORY.see * Math.min(chunk.parts, 3))
       .filter((_, i) => i % chunk.parts !== chunk.part)
       .slice(0, 8)
@@ -203,7 +235,7 @@ ${chunk.slots.map((d, i) => `Day ${chunk.start + i + 1}: ${d.date} in ${d.city}$
 ${others}
 Saved places in ${city.name}: ${saved.join("; ") || "(none)"}
 
-Candidate places in ${city.name} (${chunk.city}) from the travel guide:
-${candidateList(places, chunk.part, chunk.parts) || "  (no guide listings available)"}`;
+Candidate places in ${city.name} (${chunk.city}) from the travel guide (★ = Google rating and number of reviews, when known):
+${candidateList(places, chunk.part, chunk.parts, ratings) || "  (no guide listings available)"}`;
   return { system, user };
 }

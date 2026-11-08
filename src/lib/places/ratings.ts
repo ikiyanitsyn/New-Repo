@@ -163,6 +163,23 @@ export function resetRatingsState() {
   usage = { day: "", used: 0 };
 }
 
+const ratingKey = (providerId: string, cityCode: string, place: Place) =>
+  `${providerId}:${cityCode}:${normalizeName(place.name)}:${place.lat?.toFixed(3) ?? ""}`;
+
+/**
+ * Ratings already remembered in memory (by guide place id). Never calls the provider and never
+ * spends quota: places that were not looked up yet are simply left out. Used by the planner.
+ */
+export function cachedRatings(cityCode: string, places: Place[], providerId = "google"): Record<string, PlaceRating> {
+  const out: Record<string, PlaceRating> = {};
+  const now = Date.now();
+  for (const place of places) {
+    const hit = cache.get(ratingKey(providerId, cityCode, place));
+    if (hit?.value && hit.value.rating !== undefined && now - hit.at < cacheMs()) out[place.id] = hit.value;
+  }
+  return out;
+}
+
 function takeBudget(): boolean {
   const day = new Date().toISOString().slice(0, 10);
   if (usage.day !== day) usage = { day, used: 0 };
@@ -188,7 +205,7 @@ export async function placeRatings(cityCode: string, ids: string[], provider: Ra
   const todo: { place: Place; key: string }[] = [];
   const now = Date.now();
   for (const place of wanted) {
-    const key = `${provider.info.id}:${cityCode}:${normalizeName(place.name)}:${place.lat?.toFixed(3) ?? ""}`;
+    const key = ratingKey(provider.info.id, cityCode, place);
     const hit = cache.get(key);
     if (hit && now - hit.at < cacheMs()) ratings[place.id] = hit.value;
     else todo.push({ place, key });

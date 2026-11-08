@@ -2,14 +2,13 @@
 
 import { useMemo, useRef, useState } from "react";
 import { findCity } from "@/lib/cities";
-import { fmtDay, fmtShort } from "@/lib/format";
-import type { PlanDay, PlanItem, PlanResponse, SavedPlan } from "@/lib/ai/schema";
+import { fmtShort } from "@/lib/format";
+import type { PlanResponse, SavedPlan } from "@/lib/ai/schema";
 import { stopsWithDates, tripLegs, type Trip } from "@/lib/trip";
 import type { TripAction } from "@/lib/tripReducer";
-import {
-  ArrowIcon, BedIcon, ColumnsIcon, CompassIcon, ExternalIcon, ForkIcon, GlassIcon, SparkIcon, TrainIcon,
-} from "./icons";
+import { ArrowIcon, ExternalIcon, SparkIcon } from "./icons";
 import { PlaneLoader } from "./PlaneLoader";
+import { PlanDays } from "./concierge/PlanDays";
 
 interface Props {
   trip: Trip;
@@ -25,10 +24,6 @@ interface Official { country: string; links: { label: string; url: string }[] }
 const INTERESTS = ["Food & markets", "History & temples", "Art & design", "Nature & gardens", "Nightlife", "Shopping", "Wellness"];
 const PACE = ["Relaxed", "Balanced", "Full days"];
 const COMFORT = ["Good value", "Comfortable", "Luxury"];
-
-const KIND_ICON: Record<PlanItem["kind"], (p: { size?: number; className?: string }) => React.ReactElement> = {
-  see: ColumnsIcon, do: CompassIcon, eat: ForkIcon, drink: GlassIcon, stay: BedIcon, travel: TrainIcon, free: SparkIcon,
-};
 
 /** The browser gives up after this long; the server stops itself at about 75 seconds. */
 const CLIENT_TIMEOUT_MS = 90_000;
@@ -180,16 +175,6 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: 
   }
 
   const resp = plan?.response;
-  const byCity = useMemo(() => {
-    const groups: { city: string; days: { day: PlanDay; n: number }[] }[] = [];
-    resp?.days.forEach((day, i) => {
-      const last = groups[groups.length - 1];
-      if (last && last.city === day.city) last.days.push({ day, n: i + 1 });
-      else groups.push({ city: day.city, days: [{ day, n: i + 1 }] });
-    });
-    return groups;
-  }, [resp]);
-
   const stops = stopsWithDates(trip);
   const official: Official[] = plan?.official ?? [];
 
@@ -256,7 +241,10 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: 
               </button>
             </div>
           ) : (
-            <p className="text-center text-[12.5px] text-ink-3">Uses your route, dates and saved places.</p>
+            <p className="text-center text-[12.5px] text-ink-3">
+              Uses your route, dates and saved places.
+              {resp && " Updating writes a fresh plan and replaces any edits you made."}
+            </p>
           )}
           {error && <p className="rounded-md px-3 py-2 text-[13.5px] text-[var(--bad)]" style={{ background: "var(--surface-sunk)" }}>{error}</p>}
           {info && <p className="rounded-md px-3 py-2 text-[13.5px] text-ink-2" style={{ background: "var(--surface-sunk)" }}>{info}</p>}
@@ -315,62 +303,18 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: 
             </div>
 
             {view === "days" ? (
-              byCity.length === 0 ? (
+              resp.days.length === 0 ? (
                 <p className="text-[15px] text-ink-2">Choose your cities (or use the suggested route), then update the plan to see each day.</p>
               ) : (
-                byCity.map((g) => {
-                  const city = findCity(g.city);
-                  return (
-                    <section key={`${g.city}-${g.days[0].n}`} className="flex flex-col gap-3">
-                      <div className="flex items-baseline justify-between gap-3 border-b border-line pb-2">
-                        <h3 className="display text-[26px]">
-                          {city?.name ?? g.city}
-                          {city?.localName && <span className="ml-2 text-[15px] text-ink-3">{city.localName}</span>}
-                        </h3>
-                        <button type="button" className="text-[13px] font-medium text-accent hover:underline" onClick={() => onOpenCity(g.city)}>
-                          Stays, sights &amp; food
-                        </button>
-                      </div>
-                      {g.days.map(({ day, n }) => (
-                        <article key={day.date} className="day-card">
-                          <div className="day-date">
-                            <span className="eyebrow">Day {n}</span>
-                            <span className="data text-[13px] text-ink-2">{fmtDay(day.date)}</span>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="display text-[20px] leading-snug">{day.title}</h4>
-                            <ol className="mt-3 flex flex-col gap-3">
-                              {day.items.map((it, i) => {
-                                const Icon = KIND_ICON[it.kind];
-                                return (
-                                  <li key={i} className="flex gap-3">
-                                    <span className="day-icon"><Icon size={15} /></span>
-                                    <span className="min-w-0">
-                                      <span className="eyebrow !text-[10px]">{it.time}</span>
-                                      {it.placeName && onOpenPlace ? (
-                                        <button
-                                          type="button"
-                                          className="block text-left text-[15px] leading-snug underline decoration-[var(--line-strong)] underline-offset-4 hover:text-accent hover:decoration-[var(--accent)]"
-                                          onClick={() => onOpenPlace(day.city, it.placeName!)}
-                                          aria-label={`${it.title}: open ${it.placeName} in the city guide`}
-                                        >
-                                          {it.title}
-                                        </button>
-                                      ) : (
-                                        <span className="block text-[15px] leading-snug">{it.title}</span>
-                                      )}
-                                      {it.note && <span className="mt-0.5 block text-[13.5px] leading-relaxed text-ink-2">{it.note}</span>}
-                                    </span>
-                                  </li>
-                                );
-                              })}
-                            </ol>
-                          </div>
-                        </article>
-                      ))}
-                    </section>
-                  );
-                })
+                <PlanDays
+                  resp={resp}
+                  plan={plan!}
+                  trip={trip}
+                  editable={!busy}
+                  onChange={(response) => dispatch({ type: "planResponse", response })}
+                  onOpenCity={onOpenCity}
+                  onOpenPlace={onOpenPlace}
+                />
               )
             ) : (
               <div className="flex flex-col gap-3">
