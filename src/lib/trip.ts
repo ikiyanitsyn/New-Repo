@@ -7,6 +7,34 @@ export interface Stop {
   id: string;
   city: string; // city code
   nights: number;
+  /** A planned stopover on the way (e.g. Reykjavík for 2 nights between New York and Paris). */
+  stopover?: boolean;
+}
+
+export type TripType = "oneway" | "round" | "multi" | "stopover";
+
+/** The hotel the traveller picked for a city, with the price found when they picked it. */
+export interface ChosenHotel {
+  name: string;
+  /** Price per night in USD for the whole room, when known. */
+  nightly?: number;
+  /** Where the price came from. */
+  source: "google_hotels" | "manual" | "guide";
+  bookingUrl?: string;
+  lat?: number;
+  lon?: number;
+  /** When the price was found (prices change). */
+  pricedAt?: string;
+}
+
+/** An activity, ticket or other cost the traveller adds (tours, shows, rail passes…). */
+export interface TripCost {
+  id: string;
+  label: string;
+  /** Total in USD for the whole party. */
+  amount: number;
+  date?: string;
+  city?: string;
 }
 
 export interface Trip {
@@ -25,6 +53,18 @@ export interface Trip {
   saved?: Record<string, SavedPlace[]>;
   /** The latest AI day-by-day plan. */
   plan?: import("./ai/schema").SavedPlan;
+  /** How the trip was set up in the search (defaults to round trip / multi-city by stop count). */
+  tripType?: TripType;
+  /** Traveller names, for the itinerary cover. */
+  travellers?: string[];
+  /** Chosen hotel per city code. */
+  hotels?: Record<string, ChosenHotel>;
+  /** Confirmation codes, keyed by leg id ("outbound", "return", "a>b") or "hotel:<city>" or a cost id. */
+  confirmations?: Record<string, string>;
+  /** The traveller's own notes, keyed by date (YYYY-MM-DD). */
+  dayNotes?: Record<string, string>;
+  /** Activities and other costs. */
+  costs?: TripCost[];
 }
 
 export interface SavedPlace {

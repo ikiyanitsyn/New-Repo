@@ -1,6 +1,6 @@
 import type { Mode } from "./ground";
 import type { Cabin } from "./flights/types";
-import { newId, sampleTrip, type FlightPick, type SavedPlace, type Trip } from "./trip";
+import { newId, sampleTrip, type ChosenHotel, type FlightPick, type SavedPlace, type Trip, type TripCost, type TripType } from "./trip";
 import type { SavedPlan } from "./ai/schema";
 
 export type TripAction =
@@ -20,7 +20,16 @@ export type TripAction =
   | { type: "pick"; legId: string; pick: FlightPick | null }
   | { type: "toggleSave"; city: string; place: SavedPlace }
   | { type: "plan"; plan: SavedPlan | null }
-  | { type: "replaceStops"; stops: { city: string; nights: number }[] };
+  | { type: "replaceStops"; stops: { city: string; nights: number; stopover?: boolean }[] }
+  | { type: "tripType"; value: TripType }
+  | { type: "stopover"; id: string; value: boolean }
+  | { type: "travellers"; names: string[] }
+  | { type: "hotel"; city: string; hotel: ChosenHotel | null }
+  | { type: "confirmation"; key: string; value: string }
+  | { type: "dayNote"; date: string; text: string }
+  | { type: "addCost"; cost: Omit<TripCost, "id"> & { id?: string } }
+  | { type: "removeCost"; id: string }
+  | { type: "planResponse"; response: import("./ai/schema").PlanResponse };
 
 export function tripReducer(t: Trip, a: TripAction): Trip {
   switch (a.type) {
@@ -73,9 +82,42 @@ export function tripReducer(t: Trip, a: TripAction): Trip {
     case "replaceStops":
       return {
         ...t,
-        stops: a.stops.map((s) => ({ id: newId(), city: s.city, nights: Math.max(1, Math.min(30, Math.round(s.nights))) })),
+        stops: a.stops.map((s) => ({ id: newId(), city: s.city, nights: Math.max(1, Math.min(30, Math.round(s.nights))), ...(s.stopover ? { stopover: true } : {}) })),
         legModes: {},
         picks: {},
       };
+    case "tripType":
+      return { ...t, tripType: a.value, returnHome: a.value !== "oneway" };
+    case "stopover":
+      return { ...t, stops: t.stops.map((s) => (s.id === a.id ? { ...s, stopover: a.value || undefined } : s)) };
+    case "travellers":
+      return { ...t, travellers: a.names.map((n) => n.trim()).filter(Boolean).slice(0, 9) };
+    case "hotel": {
+      const hotels = { ...(t.hotels ?? {}) };
+      if (a.hotel) hotels[a.city] = a.hotel;
+      else delete hotels[a.city];
+      return { ...t, hotels };
+    }
+    case "confirmation": {
+      const confirmations = { ...(t.confirmations ?? {}) };
+      if (a.value.trim()) confirmations[a.key] = a.value.trim().slice(0, 60);
+      else delete confirmations[a.key];
+      return { ...t, confirmations };
+    }
+    case "dayNote": {
+      const dayNotes = { ...(t.dayNotes ?? {}) };
+      if (a.text.trim()) dayNotes[a.date] = a.text.slice(0, 2000);
+      else delete dayNotes[a.date];
+      return { ...t, dayNotes };
+    }
+    case "addCost": {
+      const amount = Math.max(0, Math.round(a.cost.amount * 100) / 100);
+      const cost: TripCost = { ...a.cost, id: a.cost.id ?? newId(), label: a.cost.label.trim().slice(0, 120) || "Cost", amount };
+      return { ...t, costs: [...(t.costs ?? []).filter((c) => c.id !== cost.id), cost] };
+    }
+    case "removeCost":
+      return { ...t, costs: (t.costs ?? []).filter((c) => c.id !== a.id) };
+    case "planResponse":
+      return t.plan ? { ...t, plan: { ...t.plan, response: a.response } } : t;
   }
 }
