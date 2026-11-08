@@ -92,6 +92,8 @@ export const PlanItem = z.object({
   kind,
   placeName: optText(120),
   note: optText(400),
+  /** True for items the traveller added themselves ("Your note"). Absent on AI-written items. */
+  mine: z.boolean().optional().catch(undefined),
 });
 
 export const PlanDay = z.object({
@@ -182,4 +184,41 @@ export interface SavedPlan {
   usedBackup?: boolean;
   /** Anything the traveller should know about this plan (e.g. days that couldn't be written). */
   notice?: string;
+}
+
+/** What the browser sends to swap one item for an alternative. */
+export const SwapRequest = z.object({
+  city: z.string().length(3),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  request: z.string().max(2000).default(""),
+  preferences: z.array(z.string().max(40)).max(20).default([]),
+  dayTitle: z.string().max(120).default(""),
+  /** The day's other items, for context. */
+  dayItems: z
+    .array(z.object({ time: z.string().max(20), title: z.string().max(120), kind: ItemKind, placeName: z.string().max(120).optional() }))
+    .max(12)
+    .default([]),
+  /** The item to replace. */
+  item: z.object({ time: z.string().max(20), title: z.string().max(120), kind: ItemKind, placeName: z.string().max(120).optional(), note: z.string().max(400).optional() }),
+  /** Places already in the plan (any city), so the alternatives don't repeat them. */
+  used: z.array(z.string().max(120)).max(120).default([]),
+  /** The traveller's saved places in this city. */
+  saved: z.array(z.string().max(120)).max(40).default([]),
+});
+export type SwapRequest = z.infer<typeof SwapRequest>;
+
+/** One alternative. `rating` is filled in from the server's cache of ratings when known. */
+export interface SwapOption {
+  title: string;
+  kind: PlanItem["kind"];
+  placeName?: string;
+  note?: string;
+  rating?: { rating: number; count?: number };
+}
+
+export interface SwapResult {
+  source: "gemini" | "sample";
+  options: SwapOption[];
+  notice?: string;
+  model?: string;
 }

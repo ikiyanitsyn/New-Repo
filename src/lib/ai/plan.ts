@@ -1,10 +1,12 @@
 import "server-only";
 import { findCity, getCity } from "../cities";
 import { cityPlaces } from "../places/wikivoyage";
+import { cachedRatings } from "../places/ratings";
 import { featureScore } from "../places/subcategory";
 import type { Place } from "../places/types";
 import { officialLinks } from "./official";
-import { buildDaysPrompt, buildOverviewPrompt, chunkSlots, dayRangeLabel, daySlots, type SlotChunk } from "./prompt";
+import { buildDaysPrompt, buildOverviewPrompt, chunkSlots, dayRangeLabel, daySlots, type RatingsById, type SlotChunk } from "./prompt";
+import { linkDays, linkPlan } from "./placeLinks";
 import { AiError, getProvider, type AiProvider, type ProviderEvent } from "./provider";
 import { DaysReply, PlanResponse, type PlanDay, type PlanRequest } from "./schema";
 
@@ -36,6 +38,8 @@ export interface PlanOptions {
   callTimeoutMs?: number;
   /** How many model calls run at once (free tiers limit requests per minute). */
   concurrency?: number;
+  /** Ratings the server already remembers, by guide place id. Shown to the model; never fetched. */
+  ratings?: RatingsById;
 }
 
 export const PLAN_BUDGET_MS = 75_000;
@@ -203,7 +207,7 @@ export async function writePlan(
   );
   const dayTasks = chunks.map((c) =>
     track(dayRangeLabel(c.start, c.slots.length), () =>
-      ask(buildDaysPrompt(r, c, placesByCity), (raw) => {
+      ask(buildDaysPrompt(r, c, placesByCity, opts.ratings), (raw) => {
         const p = DaysReply.safeParse(raw);
         if (!p.success) return null;
         const fitted = fitDays(p.data.days.filter((d) => findCity(d.city)), c);
@@ -254,7 +258,7 @@ export async function writePlan(
     questions: overview?.questions ?? [],
     routeSuggestion: overview?.routeSuggestion ?? null,
     beforeYouGo: overview?.beforeYouGo ?? [],
-    days: dropRepeats(written),
+    days: dropRepeats(linkDays(written, placesByCity)),
   };
   return {
     source: "gemini",
@@ -272,14 +276,16 @@ export async function makePlan(r: PlanRequest, opts: PlanOptions = {}): Promise<
   opts.onProgress?.({ message: "Reading the city guides…", done: 0, total: 1 });
   const guides = await Promise.all(cities.map((c) => cityPlaces(c)));
   const placesByCity = Object.fromEntries(guides.map((g) => [g.city, g.places]));
+  // Only ratings that are already remembered: the planner never spends ratings quota.
+  const ratings: RatingsById = Object.assign({}, ...guides.map((g) => cachedRatings(g.city, g.places)));
 
   const provider = getProvider();
   if (!provider) {
-    return { source: "sample", response: samplePlan(r, placesByCity), official, notice: "Sample plan. Add a Gemini key to get a personal itinerary (docs/SETUP_GUIDE.md)." };
+    return { source: "sample", response: linkPlan(samplePlan(r, placesByCity), placesByCity), official, notice: "Sample plan. Add a Gemini key to get a personal itinerary (docs/SETUP_GUIDE.md)." };
   }
   // The time budget covers the whole request, guide lookups included.
   const budgetMs = Math.max(15_000, (opts.budgetMs ?? PLAN_BUDGET_MS) - (Date.now() - startedAt));
-  return { ...(await writePlan(r, provider, placesByCity, { ...opts, budgetMs })), official };
+  return { ...(await writePlan(r, provider, placesByCity, { ...opts, budgetMs, ratings })), official };
 }
 
 /** A plausible plan built from guide listings, used when no AI key is configured. */
