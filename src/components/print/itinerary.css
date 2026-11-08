@@ -24,6 +24,8 @@
   --paper-accent-soft: #f4ecdd;
   --paper-ground: #2b7464;
   --paper-warn: #9a6216;
+  --paper-event: #d01556;
+  --paper-band: #2b2f36;
 
   min-height: 100vh;
   background: var(--bg);
@@ -98,6 +100,14 @@
 .itin-segment input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
 .itin-segment[data-on] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .itin-segment:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.itin-editHint {
+  max-width: 8.5in;
+  margin: 16px auto 0;
+  padding: 0 16px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
 
 .itin-notice {
   max-width: 8.5in;
@@ -225,28 +235,52 @@
   gap: 36px;
   min-height: 9.5in;
 }
-.itin-coverTop {
-  padding-top: 0.6in;
-  border-top: 3px solid var(--paper-ink);
+/* Charcoal header band with the big title, like the top of the owner's agenda sheet. */
+.itin-band {
+  margin: -0.7in -0.65in 0;
+  padding: 0.55in 0.65in 0.4in;
+  background: var(--paper-band);
+  color: #fffefb;
+  border-radius: 3px 3px 0 0;
+}
+.itin-bandEyebrow {
+  margin: 0;
+  font-family: var(--font-data);
+  font-size: 8.5pt;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #c9c5ba;
 }
 .itin-coverTitle {
   font-family: var(--font-display);
   font-optical-sizing: auto;
   font-weight: 500;
-  font-size: 46pt;
+  font-size: 44pt;
   line-height: 1.02;
   letter-spacing: -0.015em;
-  margin: 10px 0 14px;
+  margin: 10px 0 0;
 }
-.itin-coverDates { font-size: 15pt; margin: 0; color: var(--paper-ink-2); }
 .itin-coverRoute {
   font-family: var(--font-data);
   font-size: 11pt;
   letter-spacing: 0.06em;
   color: var(--paper-accent);
-  margin: 22px 0 0;
+  margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* Travelers / Dates / Destination, as a label-and-value table. */
+.itin-meta { margin: 0; border-bottom: 1px solid var(--paper-line-strong); }
+.itin-meta > div {
+  display: grid;
+  grid-template-columns: 8.5em 1fr;
+  gap: 0 16px;
+  padding: 9px 0;
+  border-top: 1px solid var(--paper-line);
+}
+.itin-meta > div:first-child { border-top: 0; }
+.itin-meta dt { font-family: var(--font-data); font-size: 8pt; letter-spacing: 0.12em; text-transform: uppercase; color: var(--paper-ink-3); padding-top: 3px; }
+.itin-meta dd { margin: 0; font-family: var(--font-data); font-size: 10.5pt; min-width: 0; }
 
 .itin-coverFacts {
   display: grid;
@@ -309,7 +343,8 @@
 
 .itin-gDate { display: block; font-family: var(--font-data); font-weight: 500; white-space: nowrap; }
 .itin-gWeek { display: block; font-family: var(--font-data); font-size: 0.85em; color: var(--paper-ink-3); letter-spacing: 0.08em; }
-.itin-gTitle { display: block; font-weight: 600; color: var(--paper-accent); }
+.itin-gTitle { display: block; font-weight: 600; color: var(--paper-event); }
+.itin-gNote { display: block; font-style: italic; color: var(--paper-ink-2); }
 .itin-gHigh { display: block; color: var(--paper-ink-2); }
 
 .itin-tx + .itin-tx { margin-top: 4px; }
@@ -375,7 +410,7 @@
   font-weight: 500;
   font-size: 14pt;
   line-height: 1.2;
-  color: var(--paper-accent);
+  color: var(--paper-event);
   margin: 0 0 8px;
 }
 
@@ -453,6 +488,79 @@
 .itin-bullets { margin: 6px 0 0; padding-left: 1.1em; color: var(--paper-ink-2); }
 .itin-official { margin-top: 22px; }
 
+/* ---------- Editing (screen only) and confirmations ---------- */
+
+.itin-printOnly { display: none; }
+
+/* Confirmation numbers, headline names: the spreadsheet's monospace + magenta. */
+.itin-conf { font-family: var(--font-data); font-size: 0.95em; letter-spacing: 0.02em; overflow-wrap: anywhere; }
+.itin-event { font-weight: 600; color: var(--paper-event); }
+.itin-gNote { margin-top: 2px; }
+
+.itin-field {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 9.5pt;
+  color: var(--paper-ink);
+  background: #fff;
+  border: 1px solid var(--paper-line-strong);
+  border-radius: 4px;
+}
+textarea.itin-field { resize: vertical; font-style: italic; line-height: 1.4; }
+.itin-field:focus-visible { outline: 2px solid var(--paper-accent); outline-offset: 1px; }
+.itin-confInput { font-family: var(--font-data); min-width: 9em; }
+.itin-amountInput { font-family: var(--font-data); min-width: 6em; text-align: right; }
+.itin-activities td:nth-child(2) .itin-field { min-width: 7.5em; }
+.itin-stays td:nth-child(2) { min-width: 9em; }
+.itin-stays .itin-confInput { min-width: 8em; }
+.itin-stays td:first-child, .itin-ledger .itin-conf { white-space: nowrap; }
+.itin-activities td:nth-child(3) .itin-field { min-width: 11em; }
+.itin-activities td:nth-child(1) .itin-field { min-width: 9.5em; }
+
+.itin-chips { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0 0 8px; padding: 0; }
+.itin-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 10px;
+  border-radius: 999px;
+  background: var(--paper-sunk);
+  border: 1px solid var(--paper-line-strong);
+  font-size: 9.5pt;
+}
+.itin-chip button { border: 0; background: none; cursor: pointer; font-size: 14pt; line-height: 1; padding: 0 6px; color: var(--paper-ink-3); }
+.itin-chip button:hover { color: var(--paper-event); }
+.itin-addRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 26rem; }
+.itin-addRow .itin-field { flex: 1; min-width: 9em; }
+
+.itin-addCost {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1.4fr auto;
+  gap: 8px;
+  align-items: end;
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--paper-sunk);
+  border: 1px dashed var(--paper-line-strong);
+  border-radius: 4px;
+}
+.itin-addCost label { display: grid; gap: 3px; font-size: 7.5pt; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--paper-ink-3); min-width: 0; }
+
+/* The traveller's own notes for a day: grey label, italic text. */
+.itin-note { display: grid; grid-template-columns: 4.5em 1fr; gap: 0 10px; margin-top: 10px; align-items: start; }
+.itin-noteLabel { font-size: 7.5pt; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--paper-ink-3); padding-top: 6px; }
+.itin-noteText { font-style: italic; color: var(--paper-ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 640px) {
+  .itin-addCost { grid-template-columns: 1fr 1fr; }
+  .itin-addCost label:first-child { grid-column: 1 / -1; }
+  .itin-band { margin: -28px -20px 0; padding: 32px 20px 24px; }
+  .itin-meta > div { grid-template-columns: 1fr; gap: 2px; }
+}
+
 @media (max-width: 640px) {
   .itin-toolbar { position: static; }
   .itin-sheet { padding: 28px 20px; }
@@ -504,6 +612,12 @@
   }
 
   .itin-noPrint { display: none !important; }
+  .itin-printOnly { display: inline; }
+  /* Stays and Activities are short: let them share a page. */
+  .itin-ledgerSheet + .itin-ledgerSheet { break-before: avoid; margin-top: 0.4in; }
+  .itin-noteEmpty { display: none; }
+  .itin-note { break-inside: avoid; }
+  .itin-day, .itin-txBlock, .itin-totals { break-inside: avoid; }
 
   .itin-paperStack { display: block; padding: 0; }
 
@@ -517,7 +631,7 @@
   .itin-sheet:first-child { break-before: auto; }
 
   .itin-cover { min-height: 9.4in; }
-  .itin-coverTop { padding-top: 1.4in; }
+  .itin-band { margin: 0; padding: 0.7in 0.4in 0.4in; border-radius: 0; }
 
   .itin-glanceSheet { page: glance; }
   .itin-tableScroll { overflow: visible; }

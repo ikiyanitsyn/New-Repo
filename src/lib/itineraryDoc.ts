@@ -1,10 +1,11 @@
-import { getCity } from "./cities";
+import { findCity, getCity } from "./cities";
 import { airlineName } from "./flights/airlines";
 import { fmtTime } from "./format";
 import { formatDuration, formatUsd } from "./geo";
 import { estimateLeg, type Mode } from "./ground";
 import { officialLinks } from "./ai/official";
 import type { PlanItem, PlanResponse } from "./ai/schema";
+import { tripBudget, type Budget } from "./budget";
 import { CATEGORY_LABEL, CATEGORY_ORDER, type PlaceCategory } from "./places/types";
 import { addDays, stopsWithDates, tripLegs, tripNights, type Leg, type Trip } from "./trip";
 
@@ -35,6 +36,8 @@ export interface DocTransport {
   priceBasis?: "per person" | "per vehicle";
   notes: string[];
   bookingUrl?: string;
+  /** The traveller's own confirmation number for this leg. */
+  confirmation?: string;
 }
 
 export interface DocDay {
@@ -54,6 +57,38 @@ export interface DocDay {
   items: PlanItem[];
   /** Transport cost known for this day (chosen flights plus ground estimates). */
   costUsd: number;
+  /** The traveller's own note for the day. */
+  note?: string;
+}
+
+/** One hotel stay: a row of the "Lodging Confirmations" sheet. */
+export interface DocStay {
+  stopId: string;
+  cityCode: string;
+  cityName: string;
+  /** Key for the confirmation number: "hotel:<city code>". */
+  confirmationKey: string;
+  hotel?: string;
+  checkIn: string;
+  checkOut: string;
+  nights: number;
+  /** USD per night for the room, when known. */
+  nightly?: number;
+  /** nightly x nights, when the nightly rate is known. */
+  total?: number;
+  confirmation?: string;
+  bookingUrl?: string;
+}
+
+/** One activity or other cost: a row of the "Activity Confirmations" sheet. */
+export interface DocActivity {
+  id: string;
+  label: string;
+  date?: string;
+  cityCode?: string;
+  cityName?: string;
+  amount: number;
+  confirmation?: string;
 }
 
 export interface DocPlaceGroup {
@@ -83,6 +118,8 @@ export interface ItineraryDoc {
   nights: number;
   dayCount: number;
   travellers: number;
+  /** Names on the cover; empty when none were added. */
+  travellerNames: string[];
   cabin: string;
   homeName: string;
   /** City codes in travel order, starting (and, for a round trip, ending) at home. */
@@ -92,7 +129,11 @@ export interface ItineraryDoc {
   days: DocDay[];
   cities: DocCity[];
   transport: DocTransport[];
+  stays: DocStay[];
+  activities: DocActivity[];
   totals: { flights: number; ground: number; total: number; unpricedFlights: number };
+  /** The whole-trip budget (flights, ground, stays, activities) from tripBudget(). */
+  budget: Budget;
   plan: { present: boolean; outdated: boolean; source?: "gemini" | "sample"; title?: string; summary?: string };
   beforeYouGo: PlanResponse["beforeYouGo"];
   official: { country: string; links: { label: string; url: string }[] }[];
@@ -108,6 +149,12 @@ export function weekday(iso: string): string {
 }
 
 function legTransport(trip: Trip, leg: Leg): DocTransport {
+  const t = legTransportBase(trip, leg);
+  const confirmation = trip.confirmations?.[leg.id]?.trim();
+  return confirmation ? { ...t, confirmation } : t;
+}
+
+function legTransportBase(trip: Trip, leg: Leg): DocTransport {
   const base = {
     legId: leg.id, mode: leg.mode, date: leg.date,
     from: leg.from.code, to: leg.to.code, fromName: leg.from.name, toName: leg.to.name,
@@ -154,6 +201,7 @@ export function transportLine(t: DocTransport): string {
   if (t.departTime) parts.push(`dep ${t.departTime}`);
   parts.push(formatDuration(t.durationMin));
   if (t.kind === "flight" && t.stops !== undefined && t.costKind === "chosen") parts.push(t.stops === 0 ? "nonstop" : `${t.stops} stop${t.stops > 1 ? "s" : ""}`);
+  if (t.confirmation) parts.push(`conf ${t.confirmation}`);
   if (t.costKind === "chosen" && t.costUsd !== null) parts.push(formatUsd(t.costUsd));
   else if (t.costKind === "estimate" && t.costUsd !== null) parts.push(`~${formatUsd(t.costUsd)}`);
   else parts.push("not chosen");
@@ -174,7 +222,11 @@ export function buildItinerary(trip: Trip): ItineraryDoc | null {
   const planFor = (date: string, city: string) => planDays.find((d) => d.date === date && d.city === city);
 
   const savedIn = (code: string) => trip.saved?.[code] ?? [];
-  const lodgingIn = (code: string) => savedIn(code).filter((p) => p.category === "sleep").map((p) => p.name);
+  const lodgingIn = (code: string) => {
+    const chosen = trip.hotels?.[code]?.name;
+    const names = savedIn(code).filter((p) => p.category === "sleep").map((p) => p.name);
+    return chosen ? [chosen, ...names.filter((n) => n !== chosen)] : names;
+  };
 
   // One row per calendar day, from leaving home to the last departure.
   const days: DocDay[] = [];
@@ -208,6 +260,7 @@ export function buildItinerary(trip: Trip): ItineraryDoc | null {
       highlights: items.filter((i) => i.kind !== "travel").map((i) => i.title),
       items,
       costUsd: cost,
+      ...(trip.dayNotes?.[date]?.trim() ? { note: trip.dayNotes[date].trim() } : {}),
     });
   }
 
@@ -232,6 +285,28 @@ export function buildItinerary(trip: Trip): ItineraryDoc | null {
     };
   });
 
+  const stays: DocStay[] = stops.map((s) => {
+    const h = trip.hotels?.[s.city];
+    const key = `hotel:${s.city}`;
+    return {
+      stopId: s.id, cityCode: s.city, cityName: s.cityInfo.name, confirmationKey: key,
+      hotel: h?.name, checkIn: s.arrive, checkOut: s.depart, nights: s.nights,
+      nightly: h?.nightly,
+      total: h?.nightly !== undefined ? h.nightly * s.nights : undefined,
+      confirmation: trip.confirmations?.[key]?.trim() || undefined,
+      bookingUrl: h?.bookingUrl,
+    };
+  });
+  const activities: DocActivity[] = (trip.costs ?? [])
+    .map((c) => ({
+      id: c.id, label: c.label, date: c.date, cityCode: c.city,
+      cityName: c.city ? findCity(c.city)?.name ?? c.city : undefined,
+      amount: c.amount,
+      confirmation: trip.confirmations?.[c.id]?.trim() || undefined,
+    }))
+    // Dated items in date order, undated ones last (stable otherwise).
+    .sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999"));
+
   let flights = 0, ground = 0, unpricedFlights = 0;
   for (const t of transport) {
     if (t.kind === "flight") {
@@ -250,6 +325,7 @@ export function buildItinerary(trip: Trip): ItineraryDoc | null {
     nights: tripNights(trip),
     dayCount: days.length,
     travellers: trip.adults,
+    travellerNames: (trip.travellers ?? []).map((n) => n.trim()).filter(Boolean),
     cabin: CABIN_LABEL[trip.cabin] ?? trip.cabin,
     homeName: home.name,
     route,
@@ -258,7 +334,10 @@ export function buildItinerary(trip: Trip): ItineraryDoc | null {
     days,
     cities,
     transport,
+    stays,
+    activities,
     totals: { flights, ground, total: flights + ground, unpricedFlights },
+    budget: tripBudget(trip),
     plan: {
       present: !!plan && planDays.length > 0,
       outdated: !!plan && plan.forStops !== stopSignature(trip),
@@ -273,7 +352,9 @@ export function buildItinerary(trip: Trip): ItineraryDoc | null {
 
 // ---------- At-a-glance rows and CSV ----------
 
-export const GLANCE_HEADERS = ["Date", "Day", "Weekday", "City", "Lodging", "Transport", "Plan highlights", "Cost (USD)"] as const;
+export const GLANCE_HEADERS = ["Date", "Day", "Weekday", "City", "Lodging", "Transport", "Plan highlights", "Cost (USD)", "Notes"] as const;
+export const STAY_HEADERS = ["City", "Hotel", "Check-in", "Check-out", "Nights", "Rate per night (USD)", "Total (USD)", "Confirm"] as const;
+export const ACTIVITY_HEADERS = ["Date", "City", "Activity", "Cost (USD)", "Confirm"] as const;
 
 export function glanceRows(doc: ItineraryDoc): string[][] {
   return doc.days.map((d) => [
@@ -285,7 +366,19 @@ export function glanceRows(doc: ItineraryDoc): string[][] {
     d.transport.map(transportLine).join("; ") || "—",
     [d.title, ...d.highlights].filter(Boolean).join("; ") || "—",
     d.costUsd ? String(d.costUsd) : "",
+    d.note ?? "",
   ]);
+}
+
+export function stayRows(doc: ItineraryDoc): string[][] {
+  return doc.stays.map((s) => [
+    s.cityName, s.hotel ?? "Not chosen yet", s.checkIn, s.checkOut, String(s.nights),
+    s.nightly !== undefined ? String(s.nightly) : "", s.total !== undefined ? String(s.total) : "", s.confirmation ?? "",
+  ]);
+}
+
+export function activityRows(doc: ItineraryDoc): string[][] {
+  return doc.activities.map((a) => [a.date ?? "", a.cityName ?? "", a.label, String(a.amount), a.confirmation ?? ""]);
 }
 
 /**
@@ -297,11 +390,24 @@ export function csvCell(v: string): string {
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
+/**
+ * One file with the owner's three sheets as sections: the agenda, then
+ * "Lodging Confirmations" (stays) and "Activity Confirmations" (activities).
+ */
 export function itineraryCsv(doc: ItineraryDoc): string {
-  const rows: string[][] = [[...GLANCE_HEADERS], ...glanceRows(doc)];
+  const line = (r: string[]) => r.map(csvCell).join(",");
+  const rows: string[][] = [];
+  if (doc.travellerNames.length) rows.push(["Travelers", doc.travellerNames.join("; ")]);
+  rows.push(["Dates", `${doc.startDate} to ${doc.endDate}`], ["Destination", doc.cityNames.join("; ")], []);
+  rows.push(["AGENDA"], [...GLANCE_HEADERS], ...glanceRows(doc));
   rows.push(["", "", "", "", "", "", "Transport total", String(doc.totals.total)]);
+  rows.push([], ["LODGING CONFIRMATIONS"], [...STAY_HEADERS], ...stayRows(doc));
+  rows.push(["", "", "", "", "", "Stays total", String(doc.budget.hotels)]);
+  rows.push([], ["ACTIVITY CONFIRMATIONS"], [...ACTIVITY_HEADERS], ...activityRows(doc));
+  rows.push(["", "", "Activities total", String(doc.budget.activities)]);
+  rows.push([], ["", "", "", "", "", "", "Trip total (travel, stays, activities)", String(doc.budget.total)]);
   // Byte-order mark so Excel opens the UTF-8 (Chinese city names) correctly.
-  return "﻿" + rows.map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
+  return "﻿" + rows.map(line).join("\r\n") + "\r\n";
 }
 
 export function csvFileName(doc: ItineraryDoc): string {

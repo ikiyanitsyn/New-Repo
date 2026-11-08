@@ -67,7 +67,7 @@ export function ShareDialog({ auth, sync, onClose }: { auth: AuthState; sync: Tr
 
         {!tripId ? (
           <>
-            <p className={s.lead}>Save the trip to your account first. Then you can send a link or invite someone to plan with you.</p>
+            <p className={s.lead}>This trip isn&apos;t in your account yet. Trips save there automatically once you start planning; save it now to send a link or invite someone to plan with you.</p>
             <div className={s.row}>
               <button type="button" className="btn btn-primary" onClick={sync.saveToAccount}>Save to my trips</button>
               <button type="button" className="btn" onClick={onClose}>Close</button>

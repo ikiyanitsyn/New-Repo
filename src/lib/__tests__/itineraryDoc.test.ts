@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildItinerary, csvCell, glanceRows, itineraryCsv, stopSignature, transportLine } from "../itineraryDoc";
+import { activityRows, buildItinerary, csvCell, glanceRows, itineraryCsv, stayRows, stopSignature, transportLine } from "../itineraryDoc";
 import { sampleTrip, type Trip } from "../trip";
 import type { SavedPlan } from "../ai/schema";
 
@@ -116,19 +116,97 @@ describe("itinerary document", () => {
 });
 
 describe("spreadsheet export", () => {
-  it("writes a header, one line per day and a total", () => {
+  it("writes the agenda: a header, one line per day and a transport total", () => {
     const doc = buildItinerary(richTrip())!;
-    const csv = itineraryCsv(doc);
-    expect(csv.startsWith("﻿Date,Day,Weekday,City,Lodging,Transport,Plan highlights,Cost (USD)\r\n")).toBe(true);
-    const lines = csv.trim().split("\r\n");
-    expect(lines).toHaveLength(1 + 17 + 1);
-    expect(lines[1]).toBe('2027-04-08,1,THU,New York → Beijing,—,"Flight NYC → BJS · Air China · dep 13:05 · 13h 55m · nonstop · $1,840",—,1840');
-    expect(lines.at(-1)).toBe(",,,,,,Transport total,2338");
+    const lines = itineraryCsv(doc).trim().split("\r\n");
+    const head = lines.indexOf("AGENDA");
+    expect(head).toBeGreaterThan(-1);
+    expect(lines[head + 1]).toBe("Date,Day,Weekday,City,Lodging,Transport,Plan highlights,Cost (USD),Notes");
+    expect(lines[head + 2]).toBe('2027-04-08,1,THU,New York → Beijing,—,"Flight NYC → BJS · Air China · dep 13:05 · 13h 55m · nonstop · $1,840",—,1840,');
+    expect(lines[head + 2 + 16]).toContain("2027-04-24");
+    expect(lines[head + 2 + 17]).toBe(",,,,,,Transport total,2338");
+  });
+
+  it("adds the Lodging and Activity sheets as sections, with names, notes and confirmations", () => {
+    const doc = buildItinerary(withExtras())!;
+    const lines = itineraryCsv(doc).trim().split("\r\n");
+    expect(lines.slice(0, 3)).toEqual(["Travelers,Ava; Ben", "Dates,2027-04-08 to 2027-04-24", expect.stringMatching(/^Destination,/)]);
+    const stays = lines.indexOf("LODGING CONFIRMATIONS");
+    expect(lines[stays + 1]).toBe("City,Hotel,Check-in,Check-out,Nights,Rate per night (USD),Total (USD),Confirm");
+    expect(lines[stays + 2]).toBe("Beijing,Hutong Courtyard,2027-04-09,2027-04-13,4,180,720,HTL-123");
+    expect(lines[stays + 3]).toBe("Xi'an,Not chosen yet,2027-04-13,2027-04-15,2,,,");
+    expect(lines).toContain(",,,,,Stays total,720");
+    const acts = lines.indexOf("ACTIVITY CONFIRMATIONS");
+    expect(lines[acts + 1]).toBe("Date,City,Activity,Cost (USD),Confirm");
+    expect(lines[acts + 2]).toBe("2027-04-10,Beijing,Great Wall tour,95.5,ACT-9");
+    expect(lines[acts + 3]).toBe(",,Rail pass,40.25,");
+    expect(lines).toContain(",,Activities total,136");
+    expect(lines.some((l) => l.startsWith("2027-04-10,") && l.endsWith(",Bring a jacket"))).toBe(true);
+    expect(lines.at(-1)).toContain("Trip total");
   });
 
   it("quotes commas and quotes, and defuses formulas", () => {
     expect(csvCell('Say "hi", then go')).toBe('"Say ""hi"", then go"');
     expect(csvCell("=HYPERLINK(1)")).toBe("'=HYPERLINK(1)");
     expect(csvCell("plain")).toBe("plain");
+  });
+});
+
+function withExtras(): Trip {
+  const t = richTrip();
+  t.travellers = ["Ava", "Ben"];
+  t.hotels = { BJS: { name: "Hutong Courtyard", nightly: 180, source: "manual" } };
+  t.confirmations = { outbound: "AB12CD", "hotel:BJS": "HTL-123", a1: "ACT-9" };
+  t.costs = [
+    { id: "a2", label: "Rail pass", amount: 40.25 },
+    { id: "a1", label: "Great Wall tour", amount: 95.5, date: "2027-04-10", city: "BJS" },
+  ];
+  t.dayNotes = { "2027-04-10": "Bring a jacket" };
+  return t;
+}
+
+describe("travellers, confirmations, notes, stays and activities", () => {
+  const t = withExtras();
+  const doc = buildItinerary(t)!;
+
+  it("carries traveller names (trimmed, blanks dropped) and none by default", () => {
+    expect(doc.travellerNames).toEqual(["Ava", "Ben"]);
+    expect(buildItinerary({ ...t, travellers: [" Cy ", "", "  "] })!.travellerNames).toEqual(["Cy"]);
+    expect(buildItinerary(sampleTrip())!.travellerNames).toEqual([]);
+  });
+
+  it("attaches confirmation numbers to flight legs, shown in the transport line", () => {
+    const out = doc.transport.find((x) => x.legId === "outbound")!;
+    expect(out.confirmation).toBe("AB12CD");
+    expect(transportLine(out)).toContain("conf AB12CD");
+    expect(doc.transport.find((x) => x.legId === "return")!.confirmation).toBeUndefined();
+  });
+
+  it("puts the day note on its day only", () => {
+    expect(doc.days.find((d) => d.date === "2027-04-10")!.note).toBe("Bring a jacket");
+    expect(doc.days.filter((d) => d.note)).toHaveLength(1);
+  });
+
+  it("lists one stay per stop with check-in, check-out, nights, rate and confirmation", () => {
+    expect(doc.stays).toHaveLength(5);
+    expect(doc.stays[0]).toMatchObject({ cityCode: "BJS", hotel: "Hutong Courtyard", checkIn: "2027-04-09", checkOut: "2027-04-13", nights: 4, nightly: 180, total: 720, confirmation: "HTL-123", confirmationKey: "hotel:BJS" });
+    expect(doc.stays[1]).toMatchObject({ cityCode: "SIA", hotel: undefined, total: undefined, confirmation: undefined });
+    expect(doc.days[1].lodging[0]).toBe("Hutong Courtyard"); // the chosen hotel comes before saved sleeps
+    expect(doc.days[1].lodging).toContain("Aman Summer Palace");
+    expect(stayRows(doc)[1][1]).toBe("Not chosen yet");
+  });
+
+  it("lists activities by date (undated last) with city names and confirmations", () => {
+    expect(doc.activities.map((a) => a.id)).toEqual(["a1", "a2"]);
+    expect(doc.activities[0]).toMatchObject({ label: "Great Wall tour", cityName: "Beijing", amount: 95.5, confirmation: "ACT-9" });
+    expect(doc.activities[1]).toMatchObject({ date: undefined, cityName: undefined, confirmation: undefined });
+    expect(activityRows(doc)[1]).toEqual(["", "", "Rail pass", "40.25", ""]);
+  });
+
+  it("bases the totals on tripBudget()", () => {
+    expect(doc.budget.hotels).toBe(720);
+    expect(doc.budget.activities).toBe(136); // 135.75 rounded
+    expect(doc.budget.total).toBe(doc.budget.flights + doc.budget.ground + 720 + 136);
+    expect(doc.budget.missing.hotels).toBe(4);
   });
 });

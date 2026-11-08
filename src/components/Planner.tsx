@@ -12,6 +12,8 @@ import { useAuth } from "@/lib/cloud/auth";
 import { useTripSync } from "@/lib/cloud/sync";
 import { AccountMenu } from "./cloud/AccountMenu";
 import { ShareDialog } from "./cloud/ShareDialog";
+import { BottomTabs } from "./nav/BottomTabs";
+import { activeTab } from "./nav/tabs";
 import { TripsPanel } from "./cloud/TripsPanel";
 import { CityExplorer } from "./CityExplorer";
 import { Concierge } from "./Concierge";
@@ -138,6 +140,8 @@ export function Planner() {
           <span className="wordmark-first">Intercontinental </span><em>Nomad</em>
         </Link>
         <nav className="flex items-center gap-1 text-[13.5px]" aria-label="Main">
+          {/* On phones the bottom tab bar replaces these; only the wordmark and theme toggle stay up here. */}
+          <div className="contents max-[860px]:hidden">
           <button type="button" className={`btn btn-ghost ${landingOpen ? "!text-ink" : ""}`} aria-current={landingOpen ? "page" : undefined} onClick={() => { window.location.hash = "start"; }}>
             <PlusIcon size={15} className="text-accent" /> <span className="sr-only sm:not-sr-only">New trip</span>
           </button>
@@ -161,8 +165,9 @@ export function Planner() {
             Reset to example
           </button>
           <PrintButton className="btn btn-ghost hidden md:inline-flex" label="Itinerary" />
-          <ThemeToggle />
           <AccountMenu auth={auth} sync={sync} onOpenTrips={openTrips} onShare={() => { window.location.hash = "share"; }} />
+          </div>
+          <ThemeToggle />
         </nav>
       </header>
 
@@ -218,6 +223,18 @@ export function Planner() {
         {conciergeOpen && <Concierge trip={trip} dispatch={dispatch} onClose={closeExplorer} onOpenCity={openCityFromPlan} onOpenPlace={openPlaceFromPlan} />}
       </main>
       )}
+      <BottomTabs
+        active={activeTab(hash, landingOpen)}
+        guideStopId={exploreStopId ?? datedStops[0]?.id ?? null}
+        auth={auth}
+        sync={sync}
+        onHome={() => { window.location.hash = "start"; }}
+        onTrip={() => { setStarted(true); setSelectedLegId("outbound"); replaceHash("#trip"); }}
+        onGuide={openExplorer}
+        onConcierge={openConcierge}
+        onOpenTrips={openTrips}
+        onShare={() => { window.location.hash = "share"; }}
+      />
     </div>
   );
 }
