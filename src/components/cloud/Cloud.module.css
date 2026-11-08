@@ -166,7 +166,8 @@
 .shareMessage { max-width: 560px; margin: 12vh auto; padding-inline: 24px; display: flex; flex-direction: column; gap: 14px; }
 
 @media (max-width: 860px) {
-  .trips { position: fixed; z-index: 40; padding-top: calc(28px + env(safe-area-inset-top, 0px)); }
+  /* Stops above the phone tab bar (--tabbar-h is set on the app frame by the bar). */
+  .trips { position: fixed; z-index: 40; bottom: var(--tabbar-h, 0px); padding-top: calc(28px + env(safe-area-inset-top, 0px)); }
   .dialog { padding: 22px; }
 }
 @media print {

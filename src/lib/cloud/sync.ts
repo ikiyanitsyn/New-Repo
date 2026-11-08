@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isTrip, type Trip } from "../trip";
+import { isTrip, sampleTrip, type Trip } from "../trip";
 import type { TripAction } from "../tripReducer";
 import type { AuthState } from "./auth";
 import { supabase } from "./client";
@@ -9,6 +9,8 @@ import { createTrip, friendlyError, saveTrip, type Role, type TripSummary } from
 
 /**
  * Keeps the open trip in step with its copy in your account:
+ *  - when you're signed in, a trip that isn't in your account yet is saved there automatically, once
+ *    (never the untouched example, never twice);
  *  - edits are saved a moment after you stop typing;
  *  - edits by people you share it with arrive live (Supabase Realtime);
  *  - offline edits are kept on this device and sent when you're back online.
@@ -42,6 +44,42 @@ export function reconcile(localHash: string, link: CloudLink, remoteRevision: nu
   if (remoteNewer && !localChanged) return "adopt-remote";
   if (localChanged) return "push-local";
   return "nothing";
+}
+
+export interface AutoSaveInput {
+  signedIn: boolean;
+  /** False until the traveller has left the opening page. */
+  enabled: boolean;
+  /** The open trip is already linked to a copy in the account. */
+  linked: boolean;
+  /** A create is already on its way. */
+  creating: boolean;
+  /** The open trip is the untouched example. */
+  isExample: boolean;
+  stops: number;
+  /** Fingerprint of the open trip. */
+  hash: string;
+  /** A trip that must not be auto-saved as it stands: one just unlinked or deleted, or one whose auto-save failed. */
+  blockedHash: string | null;
+}
+
+/**
+ * Should the open trip be created in the account now? Only when signed in, not
+ * yet linked, nothing is already being created, and the trip is a real one (not
+ * the example, and with at least one city). A blocked trip waits until it changes.
+ */
+export function autoSaveDecision(i: AutoSaveInput): "create" | "wait" {
+  if (!i.signedIn || !i.enabled || i.linked || i.creating) return "wait";
+  if (i.isExample || i.stops === 0) return "wait";
+  if (i.blockedHash !== null && i.blockedHash === i.hash) return "wait";
+  return "create";
+}
+
+let exampleJson: string | null = null;
+/** True when the trip is exactly the example a first-time visitor sees. */
+export function isExampleTrip(tripJson: string): boolean {
+  exampleJson ??= JSON.stringify(sampleTrip());
+  return tripJson === exampleJson;
 }
 
 function readLink(): CloudLink | null {
@@ -84,6 +122,38 @@ export function useTripSync(trip: Trip, dispatch: React.Dispatch<TripAction>, au
   }, []);
 
   const hashOf = (t: Trip) => fingerprint(JSON.stringify(t));
+
+  // Auto-save bookkeeping. `creating` stops a second create while one is in flight;
+  // `blocked` holds a trip fingerprint that must not be auto-saved; `epoch` changes when the link is dropped.
+  const creating = useRef(false);
+  const blocked = useRef<string | null>(null);
+  const epoch = useRef(0);
+
+  /** Create the open trip in the account once and link it. Never starts a second create. */
+  const createAndLink = useCallback(async (auto: boolean) => {
+    if (creating.current || latest.current.link) return;
+    // Another tab may have linked this device already.
+    const existing = readLink();
+    if (existing) { setLinkState(existing); return; }
+    const t = latest.current.trip;
+    const startEpoch = epoch.current;
+    creating.current = true;
+    setStatus("saving");
+    try {
+      const { id, revision } = await createTrip(t);
+      window.dispatchEvent(new Event("in:trips-changed"));
+      if (epoch.current !== startEpoch) { setStatus("local"); return; } // dropped meanwhile; the new copy just sits in My trips
+      setLink({ tripId: id, revision, role: "owner", syncedHash: hashOf(t) });
+      setStatus("saved");
+      setNote(null);
+    } catch (e) {
+      if (auto) blocked.current = hashOf(t);
+      setStatus("error");
+      setNote(friendlyError(e));
+    } finally {
+      creating.current = false;
+    }
+  }, [setLink]);
 
   const adopt = useCallback(
     (data: Trip, revision: number, role: Role, tripId: string) => {
@@ -150,6 +220,20 @@ export function useTripSync(trip: Trip, dispatch: React.Dispatch<TripAction>, au
     return () => clearTimeout(t);
   }, [tripJson, dirty, push]);
 
+  // Signed in and this trip isn't in the account yet: save it automatically, once.
+  const signedIn = auth.configured && !!auth.userId;
+  const unlinked = !link;
+  useEffect(() => {
+    const decision = autoSaveDecision({
+      signedIn, enabled, linked: !unlinked, creating: creating.current,
+      isExample: isExampleTrip(tripJson), stops: latest.current.trip.stops.length,
+      hash: fingerprint(tripJson), blockedHash: blocked.current,
+    });
+    if (decision !== "create") return;
+    const t = setTimeout(() => { createAndLink(true); }, SAVE_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [signedIn, enabled, unlinked, tripJson, createAndLink]);
+
   // Live edits from others.
   useEffect(() => {
     if (!active || !link) return;
@@ -185,7 +269,7 @@ export function useTripSync(trip: Trip, dispatch: React.Dispatch<TripAction>, au
     : !auth.userId
       ? (link ? "signed-out" : "local")
       : !link
-        ? "local"
+        ? (status === "saving" || status === "error" ? status : "local")
         : link.role === "viewer"
           ? "readonly"
           : status === "saving" || status === "offline" || status === "error"
@@ -198,18 +282,10 @@ export function useTripSync(trip: Trip, dispatch: React.Dispatch<TripAction>, au
     link,
     status: shownStatus,
     note,
-    saveToAccount: async () => {
-      try {
-        setStatus("saving");
-        const { id, revision } = await createTrip(trip);
-        setLink({ tripId: id, revision, role: "owner", syncedHash: hashOf(trip) });
-        setStatus("saved");
-        setNote(null);
-        window.dispatchEvent(new Event("in:trips-changed"));
-      } catch (e) {
-        setStatus("error");
-        setNote(friendlyError(e));
-      }
+    // The manual fallback (and the way to save the example on purpose). Never doubles an auto-save in flight.
+    saveToAccount: () => {
+      blocked.current = null;
+      return createAndLink(false);
     },
     openTrip: (s) => {
       if (!s.trip) return;
@@ -218,6 +294,9 @@ export function useTripSync(trip: Trip, dispatch: React.Dispatch<TripAction>, au
       setNote(null);
     },
     unlink: () => {
+      // The trip open right now stays out of the account until it changes (it was just deleted, left or set aside).
+      blocked.current = hashOf(latest.current.trip);
+      epoch.current++;
       setLink(null);
       setStatus("local");
       setNote(null);

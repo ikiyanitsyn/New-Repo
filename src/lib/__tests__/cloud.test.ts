@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fingerprint, reconcile, type CloudLink } from "../cloud/sync";
+import { autoSaveDecision, fingerprint, isExampleTrip, reconcile, type AutoSaveInput, type CloudLink } from "../cloud/sync";
 import { friendlyError, summarize } from "../cloud/trips";
 import { sampleTrip } from "../trip";
 
@@ -23,6 +23,44 @@ describe("cloud sync rules", () => {
 
   it("does nothing when both sides match", () => {
     expect(reconcile("h", link(), 3)).toBe("nothing");
+  });
+});
+
+describe("account auto-save decision", () => {
+  const real = { ...sampleTrip(), title: "My own trip" };
+  const base: AutoSaveInput = {
+    signedIn: true, enabled: true, linked: false, creating: false,
+    isExample: false, stops: 3, hash: "h1", blockedHash: null,
+  };
+
+  it("creates a changed, unlinked trip when signed in", () => {
+    expect(autoSaveDecision(base)).toBe("create");
+  });
+
+  it("waits when signed out, still on the opening page, or already linked", () => {
+    expect(autoSaveDecision({ ...base, signedIn: false })).toBe("wait");
+    expect(autoSaveDecision({ ...base, enabled: false })).toBe("wait");
+    expect(autoSaveDecision({ ...base, linked: true })).toBe("wait");
+  });
+
+  it("never starts a second create while one is in flight", () => {
+    expect(autoSaveDecision({ ...base, creating: true })).toBe("wait");
+  });
+
+  it("skips the untouched example and a trip with no cities", () => {
+    expect(isExampleTrip(JSON.stringify(sampleTrip()))).toBe(true);
+    expect(isExampleTrip(JSON.stringify(real))).toBe(false);
+    expect(autoSaveDecision({ ...base, isExample: true })).toBe("wait");
+    expect(autoSaveDecision({ ...base, stops: 0 })).toBe("wait");
+  });
+
+  it("waits on a blocked trip (just unlinked, or a failed auto-save) until it changes", () => {
+    expect(autoSaveDecision({ ...base, blockedHash: "h1" })).toBe("wait");
+    expect(autoSaveDecision({ ...base, blockedHash: "old", hash: "h2" })).toBe("create");
+  });
+
+  it("after a create is linked, the same trip is not created again", () => {
+    expect(autoSaveDecision({ ...base, linked: true })).toBe("wait");
   });
 });
 

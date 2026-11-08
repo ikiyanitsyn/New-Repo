@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildItinerary, csvFileName, itineraryCsv } from "@/lib/itineraryDoc";
 import { isTrip, sampleTrip, type Trip } from "@/lib/trip";
-import { ItineraryDocument, SECTIONS, type Layout, type SectionId } from "./ItineraryDocument";
+import { tripReducer, type TripAction } from "@/lib/tripReducer";
+import { ItineraryDocument, SECTIONS, type EditApi, type Layout, type SectionId } from "./ItineraryDocument";
 import { styles } from "./styles";
 
 /** Same key the planner saves to (see Planner.tsx). */
@@ -44,6 +45,12 @@ function loadPrefs(): Prefs {
   return DEFAULT_PREFS;
 }
 
+function saveTrip(t: Trip) {
+  try {
+    localStorage.setItem(TRIP_KEY, JSON.stringify(t));
+  } catch {}
+}
+
 function download(text: string, name: string) {
   const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
@@ -59,6 +66,19 @@ export function Itinerary() {
   const [trip, setTrip] = useState<Trip | null>(loadTrip);
   const [example, setExample] = useState(false);
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
+
+  // Edits go through the same reducer as the planner and are saved to this browser.
+  // The planner (and its account sync) picks them up the next time it opens.
+  const dispatch = useCallback((a: TripAction) => {
+    // The reducer is pure and writing the same value twice is harmless, so saving inside the updater is safe.
+    setTrip((cur) => {
+      if (!cur) return cur;
+      const next = tripReducer(cur, a);
+      saveTrip(next);
+      return next;
+    });
+  }, []);
+  const edit: EditApi | undefined = useMemo(() => (trip ? { trip, dispatch } : undefined), [trip, dispatch]);
 
   useEffect(() => {
     try {
@@ -135,6 +155,11 @@ export function Itinerary() {
         )}
       </header>
 
+      {doc && edit && (
+        <p className={`${styles.editHint} ${styles.noPrint}`}>
+          Add traveller names, confirmation numbers, day notes and bookings right on the pages below. They save in this browser, show on the printout, and sync to your account the next time you open the planner.
+        </p>
+      )}
       {example && !trip && (
         <p className={`${styles.notice} ${styles.noPrint}`}>
           This is the example trip. Plan your own in the planner and it will appear here.
@@ -143,7 +168,7 @@ export function Itinerary() {
 
       {doc ? (
         anySection ? (
-          <ItineraryDocument doc={doc} sections={prefs.sections} layout={prefs.layout} />
+          <ItineraryDocument doc={doc} sections={prefs.sections} layout={prefs.layout} edit={edit} />
         ) : (
           <p className={styles.notice}>Choose at least one section to include.</p>
         )

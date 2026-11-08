@@ -82,10 +82,16 @@ export function TripsPanel({ tab, auth, sync, onTab, onOpened, onClose, onNewTri
         </div>
 
         {error && <p className={s.error} role="alert">{error}</p>}
-        {!sync.link && tab === "mine" && (
+        {!sync.link && tab === "mine" && sync.status !== "saving" && (
           <div className={s.empty} style={{ borderStyle: "solid", borderColor: "var(--accent)", background: "var(--accent-soft)" }}>
-            <div className="text-[15px]">The trip you&apos;re planning now is only on this device.</div>
-            <button type="button" className="btn btn-primary" onClick={sync.saveToAccount}>Save it to my trips</button>
+            <div className="text-[15px]">
+              {sync.status === "error"
+                ? "The trip you're planning now didn't save to your account. It's still on this device."
+                : "Trips you plan save here automatically. The one open now isn't in your account yet (the example trip isn't saved until you change it)."}
+            </div>
+            <button type="button" className="btn btn-primary" onClick={sync.saveToAccount}>
+              {sync.status === "error" ? "Try saving again" : "Save it to my trips"}
+            </button>
           </div>
         )}
 
@@ -96,7 +102,7 @@ export function TripsPanel({ tab, auth, sync, onTab, onOpened, onClose, onNewTri
             {tab === "mine" ? (
               <>
                 <div className="display text-[22px]">No saved trips yet</div>
-                <p className={s.small}>Trips you save appear here on every device you sign in on.</p>
+                <p className={s.small}>Once you start planning, your trip saves here by itself and appears on every device you sign in on.</p>
                 <button type="button" className="btn" onClick={onNewTrip}>Start a new trip</button>
               </>
             ) : (
