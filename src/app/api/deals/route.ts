@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { findCity } from "@/lib/cities";
 import { getDeals } from "@/lib/deals/service";
+import { refreshSerpapiUsage } from "@/lib/serpapiQuota";
 
 // `from` must be a US departure city; `to` any catalog city. Live mode spends SerpApi quota.
 const Query = z.object({
@@ -21,6 +22,7 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 400 });
   }
   const { mode, ...q } = parsed.data;
+  if (mode === "live") await refreshSerpapiUsage();
   const result = await getDeals(q, mode);
   return Response.json(result, {
     // Fare trends move slowly; let the browser keep them for an hour. Live answers are per person.

@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { HotelsError, hotelsStatus, liveHotels, parseHotelsQuery } from "@/lib/hotels/live";
+import { refreshSerpapiUsage } from "@/lib/serpapiQuota";
 
 /**
  * GET /api/hotels?city=BJS&checkin=2026-11-20&checkout=2026-11-23&adults=2
@@ -9,6 +10,7 @@ import { HotelsError, hotelsStatus, liveHotels, parseHotelsQuery } from "@/lib/h
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
+  await refreshSerpapiUsage();
   if (params.get("status")) return Response.json(hotelsStatus(), { headers: { "Cache-Control": "no-store" } });
   try {
     const result = await liveHotels(parseHotelsQuery(params));

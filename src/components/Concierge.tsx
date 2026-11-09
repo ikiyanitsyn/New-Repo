@@ -9,6 +9,7 @@ import type { TripAction } from "@/lib/tripReducer";
 import { ArrowIcon, ExternalIcon, SparkIcon } from "./icons";
 import { PlaneLoader } from "./PlaneLoader";
 import { PlanDays } from "./concierge/PlanDays";
+import { STOPOVER_PROGRAMMES } from "@/lib/stopovers";
 
 interface Props {
   trip: Trip;
@@ -128,7 +129,8 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: 
         adults: trip.adults,
         cabin: trip.cabin,
         returnHome: trip.returnHome,
-        stops: trip.stops.map((s) => ({ city: s.city, nights: s.nights })),
+        stops: trip.stops.map((s) => ({ city: s.city, nights: s.nights, ...(s.stopover ? { stopover: true } : {}) })),
+        tripType: trip.tripType,
         modes: legs.filter((l) => l.kind === "between").map((l) => l.mode),
         saved: Object.fromEntries(Object.entries(trip.saved ?? {}).map(([c, list]) => [c, list.map((p) => p.name)])),
       },
@@ -194,6 +196,8 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: 
             Tell me what you love. Share a little and I&apos;ll suggest and ask a few questions; share a lot and the plan becomes yours.
           </p>
         </header>
+
+        <TripContext trip={trip} />
 
         <div className="flex flex-col gap-2">
           <label htmlFor="concierge-request" className="text-[14px] font-medium">What kind of trip is this?</label>
@@ -369,5 +373,53 @@ function ChipGroup({ label, options, selected, onToggle }: { label: string; opti
         ))}
       </div>
     </fieldset>
+  );
+}
+
+
+const TYPE_LABEL = { oneway: "One way", round: "Round trip", multi: "Multi-city", stopover: "With a stopover" } as const;
+
+/** What the concierge will plan around: the cities, nights and dates from your search. */
+function TripContext({ trip }: { trip: Trip }) {
+  const stops = stopsWithDates(trip);
+  if (!stops.length) {
+    return (
+      <div className="rounded-xl border border-line px-4 py-3 text-[13.5px] text-ink-2">
+        No cities yet. Describe the trip and the concierge will suggest a route, or{" "}
+        <a href="#start" className="underline">start with the search</a>.
+      </div>
+    );
+  }
+  const home = findCity(trip.home);
+  const end = stops[stops.length - 1].depart;
+  const type = trip.tripType ?? (trip.returnHome ? (stops.length > 1 ? "multi" : "round") : "oneway");
+  const programmes = STOPOVER_PROGRAMMES.filter((p) => stops.some((st) => st.city === p.hubCity));
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border px-4 py-3" style={{ borderColor: "var(--ground)", background: "var(--ground-soft)" }}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="eyebrow !text-[10px]">Planning for</span>
+        <a href="#start" className="text-[12.5px] font-medium text-accent hover:underline">Change in search</a>
+      </div>
+      <div className="text-[14px] leading-relaxed">
+        <span className="text-ink-2">{home?.name} →</span>{" "}
+        {stops.map((st, i) => (
+          <span key={st.id}>
+            <strong>{st.cityInfo.name}</strong> <span className="data text-[12px] text-ink-2">{st.nights}n</span>
+            {st.stopover && <span className="chip chip-accent ml-1 !h-5 !text-[10.5px]">Stopover</span>}
+            {i < stops.length - 1 ? " → " : ""}
+          </span>
+        ))}
+        {trip.returnHome && <span className="text-ink-2"> → {home?.name}</span>}
+      </div>
+      <div className="data text-[12.5px] text-ink-2">
+        {fmtShort(trip.departDate)} – {fmtShort(end)} · {trip.adults} {trip.adults === 1 ? "traveller" : "travellers"} · {TYPE_LABEL[type]}
+      </div>
+      {programmes.map((p) => (
+        <p key={p.id} className="text-[12.5px] text-ink-2">
+          <strong className="text-ink">{p.programme}:</strong> {p.benefit}{" "}
+          <a href={p.termsUrl} target="_blank" rel="noopener noreferrer" className="underline">Terms</a>
+        </p>
+      ))}
+    </div>
   );
 }

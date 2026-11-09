@@ -115,7 +115,7 @@ describe("deals service (mocked fetch, no keys in the sandbox)", () => {
 
   it("counts live searches against the monthly limit and caches them", async () => {
     process.env.SERPAPI_KEY = "serp-test";
-    process.env.SERPAPI_DEALS_MONTHLY_LIMIT = "1";
+    process.env.SERPAPI_MONTHLY_LIMIT = "1";
     const fetcher = vi.fn(async () => json(explore));
     const q = { from: "NYC", to: "TYO", month: "2027-01", adults: 1, cabin: "economy" as const };
     const a = await getDeals(q, "live", fetcher as never);

@@ -173,3 +173,14 @@
 @media print {
   .shareBar { display: none; }
 }
+
+.codeInput { font-family: var(--font-data); font-size: 26px; letter-spacing: 0.4em; text-align: center; height: 56px; }
+
+/* Account page */
+.statGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.stat { display: flex; flex-direction: column; gap: 2px; padding: 16px; border-radius: var(--radius); background: var(--surface-solid); border: 1px solid var(--line); }
+.statNum { font-family: var(--font-display); font-size: 32px; line-height: 1.05; color: var(--ink); font-variant-numeric: tabular-nums; }
+.statLabel { font-size: 13px; color: var(--ink-2); }
+.profile { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.avatarLg { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-family: var(--font-display); font-size: 28px; flex: none; }
+.links { display: flex; flex-wrap: wrap; gap: 8px; }

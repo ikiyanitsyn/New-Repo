@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CloseIcon } from "../icons";
 import {
   addMonths,
@@ -73,7 +74,33 @@ export function RangeCalendar({ mode, value, min, onChange, onClose, note, label
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const months = [view, addMonths(view, 1)];
+  // Phones: one scrolling list of months that grows as you scroll down.
+  // Desktop: two months side by side; the arrows (or a scroll over them) page through.
+  const [phone, setPhone] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 600px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 600px)");
+    const on = () => setPhone(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  const [count, setCount] = useState(4);
+  const sentinel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!phone || !sentinel.current || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver((e) => { if (e[0]?.isIntersecting) setCount((c) => Math.min(c + 3, 24)); }, { rootMargin: "200px" });
+    io.observe(sentinel.current);
+    return () => io.disconnect();
+  }, [phone, count]);
+  const wheelAt = useRef(0);
+  const onWheel = (e: React.WheelEvent) => {
+    if (phone || Math.abs(e.deltaY) < 30) return;
+    const now = Date.now();
+    if (now - wheelAt.current < 450) return;
+    wheelAt.current = now;
+    if (e.deltaY > 0) setView(addMonths(view, 1));
+    else if (view > minMonth) setView(addMonths(view, -1));
+  };
+  const months = phone ? Array.from({ length: count }, (_, i) => addMonths(view, i)) : [view, addMonths(view, 1)];
   const problem = rangeProblem(value, mode, min);
   const choosingReturn = mode === "range" && !!value.start && !value.end;
 
@@ -110,7 +137,7 @@ export function RangeCalendar({ mode, value, min, onChange, onClose, note, label
     return `${shortDay(value.start)} → ${shortDay(value.end)} · ${n} ${n === 1 ? "night" : "nights"}`;
   })();
 
-  return (
+  const sheet = (
     <>
       <div className={s.scrim} onClick={() => onClose()} aria-hidden />
       <div
@@ -138,12 +165,12 @@ export function RangeCalendar({ mode, value, min, onChange, onClose, note, label
           </button>
         </div>
 
-        <div className={s.months} ref={gridRef} onMouseLeave={() => setHover(undefined)}>
+        <div className={s.months} ref={gridRef} onMouseLeave={() => setHover(undefined)} onWheel={onWheel} data-list={phone || undefined}>
           {months.map((key, mi) => {
             const { year, month } = monthOf(key + "-01");
             const titleId = `${ids}-m${mi}`;
             return (
-              <div key={key} className={s.month} data-second={mi === 1 || undefined}>
+              <div key={key} className={s.month} data-second={(!phone && mi === 1) || undefined}>
                 <div className={`display ${s.monthTitle}`} id={titleId} aria-live={mi === 0 ? "polite" : undefined}>{monthTitle(monthKey(year, month))}</div>
                 <table className={s.grid} role="grid" aria-labelledby={titleId}>
                   <thead>
@@ -186,6 +213,7 @@ export function RangeCalendar({ mode, value, min, onChange, onClose, note, label
               </div>
             );
           })}
+          {phone && <div ref={sentinel} className={s.more} aria-hidden>More months…</div>}
         </div>
 
         <div className={s.foot}>
@@ -197,12 +225,15 @@ export function RangeCalendar({ mode, value, min, onChange, onClose, note, label
             {(value.start || value.end) && mode === "range" && (
               <button type="button" className="btn btn-ghost" onClick={() => { onChange({}); setHover(undefined); }}>Clear</button>
             )}
-            <button type="button" className="btn btn-primary" onClick={() => onClose()} disabled={!!problem}>
-              Done
+            <button type="button" className="btn btn-primary" onClick={() => onClose(value)} disabled={!!problem}>
+              {mode === "range" && value.start && value.end ? "Done · use these dates" : "Done"}
             </button>
           </div>
         </div>
       </div>
     </>
   );
+  // On phones the calendar is a full-screen sheet. Render it at the page root so it sits above
+  // the bottom tab bar (the home page's animated sections would otherwise trap it underneath).
+  return phone && typeof document !== "undefined" ? createPortal(sheet, document.body) : sheet;
 }

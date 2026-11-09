@@ -35,10 +35,12 @@ interface Props {
   onConcierge: () => void;
   onOpenTrips: (tab: "mine" | "shared") => void;
   onShare: () => void;
+  /** Open the account page (sign-in when signed out; profile, status and stats when signed in). */
+  onAccount: () => void;
 }
 
 /** The phone navigation bar. Hidden by CSS above 860px wide, where the top bar does this job. */
-export function BottomTabs({ active, guideStopId, auth, sync, onHome, onTrip, onGuide, onConcierge, onOpenTrips, onShare }: Props) {
+export function BottomTabs({ active, guideStopId, auth, sync, onHome, onTrip, onGuide, onConcierge, onOpenTrips, onShare, onAccount }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
 
@@ -59,9 +61,7 @@ export function BottomTabs({ active, guideStopId, auth, sync, onHome, onTrip, on
       case "concierge": return onConcierge();
       case "guide": return guideStopId ? onGuide(guideStopId) : undefined;
       case "account":
-        if (!auth.configured) return setMenuOpen((o) => !o);
-        if (!auth.userId) return setSigningIn(true);
-        return setMenuOpen((o) => !o);
+        return onAccount();
     }
   };
 

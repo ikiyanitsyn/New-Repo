@@ -1,3 +1,4 @@
+import { STOPOVER_PROGRAMMES } from "../stopovers";
 import { CITIES, findCity, getCity } from "../cities";
 import { addDays, stopsWithDates, type Trip } from "../trip";
 import { CATEGORY_LABEL, type Place, type PlaceCategory, type PlaceRating } from "../places/types";
@@ -29,7 +30,7 @@ export function requestTrip(r: PlanRequest): Trip {
     returnHome: r.trip.returnHome,
     adults: r.trip.adults,
     cabin: "economy",
-    stops: r.trip.stops.map((s, i) => ({ id: `s${i}`, city: s.city, nights: s.nights })),
+    stops: r.trip.stops.map((s, i) => ({ id: `s${i}`, city: s.city, nights: s.nights, ...(s.stopover ? { stopover: true } : {}) })),
     legModes: {},
   };
 }
@@ -157,11 +158,35 @@ function travellerBlock(r: PlanRequest): string {
   return `Traveller request: ${r.request.trim() || "(none given: suggest a well-balanced trip)"}
 Preferences: ${r.preferences.join(", ") || "(none chosen)"}
 Answers to earlier questions: ${answers || "(none)"}
-Travellers: ${r.trip.adults} adult${r.trip.adults > 1 ? "s" : ""} from ${getCity(r.trip.home).name}, US passports. Leaving ${r.trip.departDate}.`;
+Travellers: ${r.trip.adults} adult${r.trip.adults > 1 ? "s" : ""} from ${getCity(r.trip.home).name}, US passports. Leaving ${r.trip.departDate}.
+Trip type: ${TRIP_TYPE_TEXT[r.trip.tripType ?? (r.trip.returnHome ? (r.trip.stops.length > 1 ? "multi" : "round") : "oneway")]}.${stopoverBlock(r)}`;
+}
+
+const TRIP_TYPE_TEXT = {
+  oneway: "one way (no flight home)",
+  round: "round trip",
+  multi: "multi-city, flying home from the last city",
+  stopover: "a planned stopover on the way, then the destination",
+} as const;
+
+/**
+ * Stopover cities and programme hubs on this route, with the programme's benefit,
+ * so the plan can use it (e.g. Icelandair's free Iceland stopover, China's
+ * 240-hour visa-free transit). Terms change, so the model is told to say so.
+ */
+export function stopoverBlock(r: PlanRequest): string {
+  const lines: string[] = [];
+  for (const st of r.trip.stops) {
+    const programmes = STOPOVER_PROGRAMMES.filter((p) => p.hubCity === st.city);
+    const name = getCity(st.city).name;
+    if (st.stopover) lines.push(`- ${name} is a planned stopover (${st.nights} ${st.nights === 1 ? "night" : "nights"}): treat it as a short, highlights-focused visit.`);
+    for (const p of programmes) lines.push(`- ${p.airline} ${p.programme} (${p.hubName}): ${p.benefit} Mention it where useful and tell the traveller to check current terms: ${p.termsUrl}`);
+  }
+  return lines.length ? `\nStopovers and programmes on this route:\n${lines.join("\n")}` : "";
 }
 
 const routeLine = (r: PlanRequest) =>
-  r.trip.stops.map((s) => `${getCity(s.city).name} (${s.city}) ${s.nights}n`).join(" → ") || "(no stops chosen yet)";
+  r.trip.stops.map((s) => `${getCity(s.city).name} (${s.city}) ${s.nights}n${s.stopover ? " [stopover]" : ""}`).join(" → ") || "(no stops chosen yet)";
 
 /** The overview call: title, summary, questions, route suggestion and the "Before you go" brief. */
 export function buildOverviewPrompt(r: PlanRequest): { system: string; user: string } {

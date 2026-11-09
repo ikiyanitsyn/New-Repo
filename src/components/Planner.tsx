@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useMemo, useReducer, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { getCity } from "@/lib/cities";
 import { isTrip, sampleTrip, stopsWithDates, tripLegs, type Trip } from "@/lib/trip";
 import { tripReducer } from "@/lib/tripReducer";
@@ -11,11 +11,13 @@ import { PrintButton } from "./print/PrintButton";
 import { useAuth } from "@/lib/cloud/auth";
 import { useTripSync } from "@/lib/cloud/sync";
 import { AccountMenu } from "./cloud/AccountMenu";
+import { AccountPanel } from "./cloud/AccountPanel";
 import { ShareDialog } from "./cloud/ShareDialog";
 import { BottomTabs } from "./nav/BottomTabs";
 import { activeTab } from "./nav/tabs";
 import { TripsPanel } from "./cloud/TripsPanel";
 import { CityExplorer } from "./CityExplorer";
+import { addPlaceToPlan } from "@/lib/planAdd";
 import { Concierge } from "./Concierge";
 import { PlusIcon, SparkIcon } from "./icons";
 import { Landing } from "./Landing";
@@ -24,6 +26,9 @@ import { nextLegNeedingFlight } from "@/lib/flights/nextLeg";
 import { usePersistedFlag } from "./planner/usePersistedFlag";
 import { ThemeToggle } from "./ThemeToggle";
 import { TripBuilder } from "./TripBuilder";
+import type { AllFaresState } from "./planner/AllFares";
+import { fareRequestUrl, flightLegs, quoteFrom, type FareQuote } from "@/lib/flights/batch";
+import type { FlightSearchResult } from "@/lib/flights/types";
 
 const Globe = dynamic(() => import("./Globe"), { ssr: false, loading: () => <div className="globe" /> });
 
@@ -128,6 +133,7 @@ export function Planner() {
   const conciergeOpen = hash === "#concierge";
   const tripsTab = hash === "#trips" ? "mine" : hash === "#shared" ? "shared" : null;
   const shareOpen = hash === "#share";
+  const accountOpen = hash === "#account";
   // Home (the search) is the default view: "" or "#start". The planner lives at "#trip".
   const landingOpen = hash === "" || hash === "#start";
   const openExplorer = (stopId: string) => { window.location.hash = `explore-${stopId}`; };
@@ -150,7 +156,55 @@ export function Planner() {
   };
   const closeExplorer = () => replaceHash("#trip");
   // A brand-new trip (or the example) must not overwrite the trip saved in the account.
-  const startFresh = () => { sync.unlink(); showPlanner(); };
+  const startFresh = () => { sync.unlink(); showPlanner(); autoFares.current = true; };
+
+  // ---- Price every flight at once ("Search all"); live results are reused by each fares panel. ----
+  const [quotes, setQuotes] = useState<Record<string, FareQuote>>({});
+  const [faresRun, setFaresRun] = useState<AllFaresState["running"]>(null);
+  const [liveLegs, setLiveLegs] = useState<string[]>([]);
+  const [liveInfo, setLiveInfo] = useState<{ available: boolean; left: number | null }>({ available: false, left: null });
+  const autoFares = useRef(false);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/hotels?status=1").then((r) => r.json()).then((j) => {
+      if (alive) setLiveInfo({ available: !!j.available, left: j.quota ? Math.max(0, j.quota.limit - j.quota.used) : null });
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const searchAllFlights = async (live: boolean) => {
+    const list = flightLegs(tripLegs(trip));
+    if (!list.length || faresRun) return;
+    setFaresRun({ live, done: 0, total: list.length });
+    for (let i = 0; i < list.length; i++) {
+      const leg = list[i];
+      try {
+        const r = await fetch(fareRequestUrl(leg, trip, live));
+        const j = (await r.json()) as FlightSearchResult;
+        const q = r.ok ? quoteFrom(j, leg, live && j.source === "serpapi") : null;
+        if (q) setQuotes((all) => ({ ...all, [leg.id]: q }));
+        if (live && j.source === "serpapi") setLiveLegs((ids) => (ids.includes(leg.id) ? ids : [...ids, leg.id]));
+        if (j.liveQuota) setLiveInfo((x) => ({ ...x, left: Math.max(0, j.liveQuota!.limit - j.liveQuota!.used) }));
+      } catch {
+        // One leg failing leaves the others; that flight can still be searched on its own.
+      }
+      setFaresRun({ live, done: i + 1, total: list.length });
+    }
+    setFaresRun(null);
+  };
+  // Right after "Start planning", price every flight from the free recent-fares data.
+  const legsKey = legs.map((l) => `${l.id}:${l.date}`).join(",");
+  useEffect(() => {
+    if (!autoFares.current || !legs.length) return;
+    autoFares.current = false;
+    // Next tick, with the freshly built trip.
+    void Promise.resolve().then(() => searchAllFlights(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [legsKey]);
+  const allFares: AllFaresState = {
+    quotes, running: faresRun, liveLeft: liveInfo.left, liveAvailable: liveInfo.available, onSearchAll: (live) => { void searchAllFlights(live); },
+  };
+  // After the last flight: the first stop that still needs a hotel.
+  const needsHotel = datedStops.find((st) => !trip.hotels?.[st.city]) ?? datedStops[0];
   const openTrips = (tab: "mine" | "shared") => { window.location.hash = tab === "mine" ? "trips" : "shared"; };
 
   return (
@@ -186,7 +240,7 @@ export function Planner() {
           </button>
           <PrintButton className="btn btn-ghost hidden md:inline-flex" label="Itinerary" />
           <Link href="/styles" className="btn btn-ghost hidden xl:inline-flex" title="Compare colours, fonts and motion">Style board</Link>
-          <AccountMenu auth={auth} sync={sync} onOpenTrips={openTrips} onShare={() => { window.location.hash = "share"; }} />
+          <AccountMenu auth={auth} sync={sync} onOpenTrips={openTrips} onShare={() => { window.location.hash = "share"; }} onAccount={() => { window.location.hash = "account"; }} />
           </div>
           <ThemeToggle />
         </nav>
@@ -213,7 +267,7 @@ export function Planner() {
           </button>
         </div>
         <div className="stage-panels">
-          <TripBuilder trip={trip} dispatch={dispatch} legs={legs} selectedLegId={activeLegId} onSelectLeg={selectLeg} onExplore={openExplorer} onConcierge={openConcierge} />
+          <TripBuilder trip={trip} dispatch={dispatch} legs={legs} selectedLegId={activeLegId} onSelectLeg={selectLeg} onExplore={openExplorer} onConcierge={openConcierge} allFares={allFares} />
           <LegPanel
             leg={selectedLeg}
             trip={trip}
@@ -221,6 +275,9 @@ export function Planner() {
             onPick={(legId, pick) => dispatch({ type: "pick", legId, pick })}
             onDate={(date) => dispatch({ type: "date", date })}
             onNextLeg={goToNextFlightLeg}
+            liveLegs={liveLegs}
+            onStays={needsHotel ? () => openExplorer(needsHotel.id) : undefined}
+            staysCity={needsHotel?.cityInfo.name}
             collapsed={faresCollapsed}
             onCollapse={() => setFaresCollapsed(true)}
             onExpand={() => setFaresCollapsed(false)}
@@ -239,6 +296,11 @@ export function Planner() {
             initialPlaceName={hashPlace}
             hotel={trip.hotels?.[datedStops.find((s) => s.id === exploreStopId)!.city]}
             onChooseHotel={(hotel) => dispatch({ type: "hotel", city: datedStops.find((s) => s.id === exploreStopId)!.city, hotel })}
+            onAddToPlan={(place, date, time) => {
+              const plan = addPlaceToPlan(trip, place, date, time);
+              if (plan) dispatch({ type: "plan", plan });
+              return !!plan;
+            }}
           />
         )}
         {tripsTab && (
@@ -250,6 +312,15 @@ export function Planner() {
             onOpened={showPlanner}
             onClose={closeExplorer}
             onNewTrip={() => { sync.unlink(); window.location.hash = "start"; }}
+          />
+        )}
+        {accountOpen && (
+          <AccountPanel
+            auth={auth}
+            sync={sync}
+            onClose={() => replaceHash("#trip")}
+            onOpenTrips={openTrips}
+            onShare={() => { window.location.hash = "share"; }}
           />
         )}
         {shareOpen && <ShareDialog auth={auth} sync={sync} onClose={closeExplorer} />}
@@ -267,6 +338,7 @@ export function Planner() {
         onConcierge={openConcierge}
         onOpenTrips={openTrips}
         onShare={() => { window.location.hash = "share"; }}
+        onAccount={() => { window.location.hash = "account"; }}
       />
     </div>
   );

@@ -39,6 +39,8 @@ interface Props {
   hotel?: ChosenHotel;
   /** Save (or, with null, clear) the chosen hotel for this stop. */
   onChooseHotel?: (hotel: ChosenHotel | null) => void;
+  /** Add a place to a day of the itinerary. Returns false when that day isn't in the plan. */
+  onAddToPlan?: (place: Place, date: string, time: string) => boolean;
 }
 
 type Tab = PlaceCategory | "saved";
@@ -80,7 +82,7 @@ function sameHotel(hotel: ChosenHotel | undefined, p: Place, cityName: string): 
   return !!hotel && nameSimilarity(hotel.name, p.name, [cityName]) >= 0.9;
 }
 
-export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNavigate, onClose, comfort, initialPlaceName, hotel, onChooseHotel }: Props) {
+export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNavigate, onClose, comfort, initialPlaceName, hotel, onChooseHotel, onAddToPlan }: Props) {
   const index = Math.max(0, stops.findIndex((s) => s.id === stopId));
   const stop = stops[index];
   const city = stop.cityInfo;
@@ -412,6 +414,7 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
               live={liveById[detail.id]}
               livePricedAt={liveData?.fetchedAt}
               nights={nightsCount}
+              addToPlan={onAddToPlan && detail.category !== "sleep" ? { stop, onAdd: (date, time) => onAddToPlan(detail, date, time) } : undefined}
               chosen={sameHotel(hotel, detail, city.name)}
               chosenSource={hotel?.source}
               onChoose={onChooseHotel && detail.category === "sleep" ? (manual) => choose(detail, manual) : undefined}
@@ -843,12 +846,61 @@ function Review({ review: r }: { review: PlaceRating["reviews"][number] }) {
   );
 }
 
-function PlaceDetail({ place: p, sub, rating, ratingPending, provider, saved, onSave, onBack, backLabel, links, live, livePricedAt, nights, chosen, chosenSource, onChoose }: {
+const TIMES = ["Morning", "Afternoon", "Evening"] as const;
+
+function stopDays(stop: StopWithDates): string[] {
+  const out: string[] = [];
+  const d = new Date(`${stop.arrive}T12:00:00Z`);
+  const end = new Date(`${stop.depart}T12:00:00Z`);
+  while (d < end) {
+    out.push(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out.length ? out : [stop.arrive];
+}
+
+/** "Add to my plan": pick a day of this stop and a time of day. */
+function AddToPlan({ stop, onAdd }: { stop: StopWithDates; onAdd: (date: string, time: string) => boolean }) {
+  const days = stopDays(stop);
+  const [date, setDate] = useState(days[0]);
+  const [time, setTime] = useState<string>("Morning");
+  const [done, setDone] = useState<string | null>(null);
+  const [err, setErr] = useState(false);
+  return (
+    <section className="price-box flex flex-col gap-3" aria-label="Add to my plan">
+      <div className="eyebrow">Add to my itinerary</div>
+      <div className="flex flex-wrap items-center gap-2">
+        <select className="field !h-9 !w-auto !text-[14px]" value={date} onChange={(e) => { setDate(e.target.value); setDone(null); }} aria-label="Day">
+          {days.map((d, i) => <option key={d} value={d}>Day {i + 1} in {stop.cityInfo.name} · {fmtShort(d)}</option>)}
+        </select>
+        <div className="flex gap-1" role="group" aria-label="Time of day">
+          {TIMES.map((t) => (
+            <button key={t} type="button" aria-pressed={time === t} className={`btn !h-9 !px-3 !text-[13px] ${time === t ? "btn-primary" : ""}`} onClick={() => { setTime(t); setDone(null); }}>{t}</button>
+          ))}
+        </div>
+        <button type="button" className="btn btn-primary !h-9" onClick={() => {
+          const ok = onAdd(date, time);
+          setErr(!ok);
+          setDone(ok ? `${fmtShort(date)}, ${time.toLowerCase()}` : null);
+        }}>Add</button>
+      </div>
+      {done && (
+        <p role="status" className="text-[13.5px] text-ink-2">
+          Added for {done}. <a href="#concierge" className="underline underline-offset-2">See your day-by-day plan →</a>
+        </p>
+      )}
+      {err && <p role="status" className="text-[13.5px] text-ink-2">That day isn&rsquo;t in your plan. Open the concierge to update the plan for your new dates.</p>}
+    </section>
+  );
+}
+
+function PlaceDetail({ place: p, sub, rating, ratingPending, provider, saved, onSave, onBack, backLabel, links, live, livePricedAt, nights, chosen, chosenSource, onChoose, addToPlan }: {
   place: Place; sub: string; rating?: PlaceRating | null; ratingPending: boolean; provider: RatingsProviderInfo | null;
   saved: boolean; onSave: () => void; onBack: () => void; backLabel: string; links: OutLink[];
   live?: LiveHotel; livePricedAt?: string; nights: number; chosen: boolean; chosenSource?: ChosenHotel["source"];
   /** Present for stays when choosing is possible. `manual` is a price the traveller typed in. */
   onChoose?: (manual?: number) => void;
+  addToPlan?: { stop: StopWithDates; onAdd: (date: string, time: string) => boolean };
 }) {
   const [imgOk, setImgOk] = useState(true);
   const facts: [string, string | undefined][] = [
@@ -924,6 +976,7 @@ function PlaceDetail({ place: p, sub, rating, ratingPending, provider, saved, on
       )}
 
       {p.description && <p className="text-[16px] leading-relaxed text-ink">{p.description}</p>}
+      {addToPlan && <AddToPlan key={p.id} stop={addToPlan.stop} onAdd={addToPlan.onAdd} />}
       {facts.some(([, v]) => v) && (
         <dl className="facts">
           {facts.filter(([, v]) => v).map(([k, v]) => (

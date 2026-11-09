@@ -36,6 +36,7 @@ Everything here is on the **free plan**. No card is needed.
 4. **Set up sign-in.**
    - **Authentication → Sign In / Providers**: make sure **Email** is enabled.
    - **Authentication → URL Configuration**: set **Site URL** to `http://localhost:3000`. Under **Redirect URLs** add `http://localhost:3000/**`. When the site goes live on Vercel, add `https://<your-site>.vercel.app/**` too.
+   - **Authentication → Email Templates → Magic Link**: add the 6-digit code to the email so sign-in works inside the iPhone home-screen app (links open in Safari, which can't sign the app in). Put this line in the message body, for example under the link: `Or enter this code in the app: {{ .Token }}`. Do the same in the **Confirm signup** template, which new accounts get instead. Save each template.
    - Optional, Google sign-in: **Authentication → Sign In / Providers → Google**. This needs a Google Cloud OAuth client; the tutor can walk you through it, or skip it, since email links work fine.
 5. **Copy the keys into `.env.local`.** Open **Project Settings → API Keys** (older layout: **Project Settings → API**). Copy the **Project URL** and the **publishable** (or **anon public**) key, then add to `.env.local`:
 
@@ -65,5 +66,6 @@ Everything here is on the **free plan**. No card is needed.
 |---|---|
 | SQL Editor shows an error | Copy the whole error message into your tutor chat. Running the file again is safe. |
 | Sign-in email never arrives | Check spam. The free plan sends a limited number of emails per hour; wait a few minutes. |
+| The email has a link but no 6-digit code | Add `{{ .Token }}` to the **Magic Link** and **Confirm signup** templates (step 4). |
 | The link opens a page that says "redirect not allowed" | Add the address you're using to **Authentication → URL Configuration → Redirect URLs**. |
 | You pasted the secret / service_role key somewhere | **Project Settings → API Keys** → roll (regenerate) it. The app never needs that key. |

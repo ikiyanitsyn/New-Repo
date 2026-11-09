@@ -21,14 +21,21 @@ interface Props {
   collapsed?: boolean;
   onCollapse?: () => void;
   onExpand?: () => void;
+  /** Flights already searched live (via "Live prices for all"), opened in live mode from the cache. */
+  liveLegs?: string[];
+  /** When every flight is chosen: take the traveller on to hotels. */
+  onStays?: () => void;
+  /** City name for the "choose where to stay" prompt. */
+  staysCity?: string;
 }
 
 /** How long the "Added to your trip" note stays, and how long before the next leg opens. */
 const TOAST_MS = 3200;
 const ADVANCE_MS = 1100;
 
-export function LegPanel({ leg, trip, onMode, onPick, onDate, onNextLeg, collapsed = false, onCollapse, onExpand }: Props) {
+export function LegPanel({ leg, trip, onMode, onPick, onDate, onNextLeg, collapsed = false, onCollapse, onExpand, liveLegs, onStays, staysCity }: Props) {
   const [toast, setToast] = useState<string | null>(null);
+  const [allChosen, setAllChosen] = useState(false);
   const timers = useRef<number[]>([]);
   const nextRef = useRef(onNextLeg);
   useEffect(() => {
@@ -44,7 +51,10 @@ export function LegPanel({ leg, trip, onMode, onPick, onDate, onNextLeg, collaps
     timers.current = [
       window.setTimeout(() => {
         const moved = nextRef.current?.(legId);
-        if (moved === false) setToast((t) => (t ? `${t} \u00b7 all flights chosen` : t));
+        if (moved === false) {
+          setToast((t) => (t ? `${t} \u00b7 all flights chosen` : t));
+          setAllChosen(true);
+        }
       }, ADVANCE_MS),
       window.setTimeout(() => setToast(null), TOAST_MS),
     ];
@@ -72,10 +82,22 @@ export function LegPanel({ leg, trip, onMode, onPick, onDate, onNextLeg, collaps
               onPick={(p) => choose(leg.id, p)}
               onPickDate={onDate}
               onCollapse={onCollapse}
+              startLive={liveLegs?.includes(leg.id)}
             />
           </>
         ) : (
           <GroundDetail leg={leg} adults={trip.adults} onMode={(m) => onMode(leg.id, m)} onCollapse={onCollapse} />
+        )}
+        {allChosen && onStays && (
+          <div className="mx-4 mb-3 flex flex-col gap-2 rounded-xl border px-4 py-3" style={{ borderColor: "var(--accent)", background: "var(--accent-soft)" }}>
+            <div className="text-[14px] font-medium">All flights chosen. Next, where you&apos;ll stay.</div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn btn-primary !h-9" onClick={() => { setAllChosen(false); onStays(); }}>
+                Choose a hotel{staysCity ? ` in ${staysCity}` : ""} →
+              </button>
+              <button type="button" className="btn btn-ghost !h-9" onClick={() => setAllChosen(false)}>Later</button>
+            </div>
+          </div>
         )}
         {toast && (
           <div role="status" className="results-toast">

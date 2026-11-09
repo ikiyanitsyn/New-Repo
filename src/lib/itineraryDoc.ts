@@ -134,7 +134,7 @@ export interface ItineraryDoc {
   totals: { flights: number; ground: number; total: number; unpricedFlights: number };
   /** The whole-trip budget (flights, ground, stays, activities) from tripBudget(). */
   budget: Budget;
-  plan: { present: boolean; outdated: boolean; source?: "gemini" | "sample"; title?: string; summary?: string };
+  plan: { present: boolean; outdated: boolean; source?: "gemini" | "sample" | "manual"; title?: string; summary?: string };
   beforeYouGo: PlanResponse["beforeYouGo"];
   official: { country: string; links: { label: string; url: string }[] }[];
 }

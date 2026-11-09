@@ -23,6 +23,8 @@ interface Props {
   /** Move the trip's departure date (outbound flight only). */
   onPickDate?: (date: string) => void;
   onCollapse?: () => void;
+  /** Open with live prices (already searched via "Live prices for all"; served from the cache). */
+  startLive?: boolean;
 }
 
 const SOURCE_LABEL: Record<FlightSearchResult["source"], { text: string; cls: string; detail: string }> = {
@@ -31,12 +33,12 @@ const SOURCE_LABEL: Record<FlightSearchResult["source"], { text: string; cls: st
   serpapi: { text: "Live · Google Flights", cls: "chip-accent", detail: "Checked just now." },
 };
 
-export function FlightResults({ leg, trip, pick, onPick, onPickDate, onCollapse }: Props) {
+export function FlightResults({ leg, trip, pick, onPick, onPickDate, onCollapse, startLive}: Props) {
   const [sort, setSort] = useState<SortMode>("best");
   const [filter, setFilter] = useState<LayoverFilter>(NO_LAYOVER_FILTER);
   // Pressing "Check live prices" sends the stops and layover choices of that moment to SerpApi.
   // Later changes filter the results in the browser, so they never spend another live search.
-  const [live, setLive] = useState<LayoverFilter | null>(null);
+  const [live, setLive] = useState<LayoverFilter | null>(() => (startLive ? NO_LAYOVER_FILTER : null));
   // The parent remounts this component when the route, date or travellers change.
   const params = new URLSearchParams({
     from: leg.from.code, to: leg.to.code, date: leg.date,

@@ -22,9 +22,10 @@ interface Props {
   sync: TripSync;
   onOpenTrips: (tab: "mine" | "shared") => void;
   onShare: () => void;
+  onAccount?: () => void;
 }
 
-export function AccountMenu({ auth, sync, onOpenTrips, onShare }: Props) {
+export function AccountMenu({ auth, sync, onOpenTrips, onShare, onAccount }: Props) {
   const [open, setOpen] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -69,11 +70,12 @@ export function AccountMenu({ auth, sync, onOpenTrips, onShare }: Props) {
         </button>
       )}
       <button type="button" className={s.avatar} aria-haspopup="menu" aria-expanded={open} aria-label="Account menu" onClick={() => setOpen((o) => !o)}>
-        {(auth.email ?? "?").slice(0, 1).toUpperCase()}
+        {(auth.name ?? auth.email ?? "?").slice(0, 1).toUpperCase()}
       </button>
       {open && (
         <div className={s.menu} role="menu">
-          <div className={s.menuEmail}>Signed in as {auth.email}</div>
+          <div className={s.menuEmail}>Signed in as {auth.name ? <><strong>{auth.name}</strong><br /></> : null}{auth.email}</div>
+          {onAccount && <button type="button" role="menuitem" onClick={() => { setOpen(false); onAccount(); }}>Account &amp; stats</button>}
           {sync.link ? (
             <div className={s.menuEmail}>{STATUS[sync.status]?.text ?? "Saved to My trips"} · your changes save automatically</div>
           ) : (

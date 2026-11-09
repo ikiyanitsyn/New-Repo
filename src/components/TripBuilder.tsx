@@ -9,6 +9,8 @@ import { stopsWithDates, tripNights, type FlightPick, type Leg, type Trip } from
 import type { TripAction } from "@/lib/tripReducer";
 import { CityPicker } from "./CityPicker";
 import { BudgetFooter } from "./planner/BudgetFooter";
+import { AllFares, QuoteLine, type AllFaresState } from "./planner/AllFares";
+import type { FareQuote } from "@/lib/flights/batch";
 import { TripSummary } from "./planner/TripSummary";
 import { SplitFlap } from "./SplitFlap";
 import { ArrowIcon, SparkIcon, CloseIcon, DownIcon, MinusIcon, MODE_ICON, MODE_LABEL, PlaneIcon, PlusIcon, UpIcon } from "./icons";
@@ -21,9 +23,11 @@ interface Props {
   onSelectLeg: (id: string) => void;
   onExplore: (stopId: string) => void;
   onConcierge: () => void;
+  /** Price every flight at once (from the planner). */
+  allFares?: AllFaresState;
 }
 
-export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, onExplore, onConcierge }: Props) {
+export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, onExplore, onConcierge, allFares }: Props) {
   const [adding, setAdding] = useState(false);
   const stops = stopsWithDates(trip);
   const nights = tripNights(trip);
@@ -58,11 +62,12 @@ export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, 
 
       <div className="scroll-y flex min-h-0 flex-1 flex-col gap-5 px-5 py-4">
         <TripSummary trip={trip} />
+        {allFares && <AllFares count={legs.filter((l) => l.mode === "flight").length} state={allFares} />}
 
         {/* Route timeline */}
         <ol className="relative flex flex-col" aria-label="Route">
           {outbound && (
-            <FlightLegRow leg={outbound} label="Outbound" selected={selectedLegId === "outbound"} onSelect={onSelectLeg} pick={trip.picks?.outbound} />
+            <FlightLegRow leg={outbound} label="Outbound" selected={selectedLegId === "outbound"} onSelect={onSelectLeg} pick={trip.picks?.outbound} quote={fresh(allFares?.quotes.outbound, outbound.date)} />
           )}
 
           {stops.map((s, i) => {
@@ -105,6 +110,7 @@ export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, 
                     onSelect={onSelectLeg}
                     onMode={(m) => dispatch({ type: "mode", key: leg.id, mode: m })}
                     pick={trip.picks?.[leg.id]}
+                    quote={fresh(allFares?.quotes[leg.id], leg.date)}
                   />
                 )}
               </li>
@@ -138,7 +144,7 @@ export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, 
               </label>
             </li>
           )}
-          {ret && <FlightLegRow leg={ret} label="Return" selected={selectedLegId === "return"} onSelect={onSelectLeg} pick={trip.picks?.return} />}
+          {ret && <FlightLegRow leg={ret} label="Return" selected={selectedLegId === "return"} onSelect={onSelectLeg} pick={trip.picks?.return} quote={fresh(allFares?.quotes.return, ret.date)} />}
         </ol>
       </div>
 
@@ -157,7 +163,10 @@ function Stepper({ value, min, max, onChange, label, suffix }: { value: number; 
   );
 }
 
-function FlightLegRow({ leg, label, selected, onSelect, pick }: { leg: Leg; label: string; selected: boolean; onSelect: (id: string) => void; pick?: FlightPick }) {
+/** A quote only counts for the date it was searched. */
+const fresh = (q: FareQuote | undefined, date: string) => (q && q.date === date ? q : undefined);
+
+function FlightLegRow({ leg, label, selected, onSelect, pick, quote }: { leg: Leg; label: string; selected: boolean; onSelect: (id: string) => void; pick?: FlightPick; quote?: FareQuote }) {
   const valid = pick && pick.date === leg.date;
   return (
     <li className="py-1">
@@ -185,7 +194,7 @@ function FlightLegRow({ leg, label, selected, onSelect, pick }: { leg: Leg; labe
               <span className="text-ink-3">{pick.airlines[0]}</span>
             </>
           ) : (
-            <span className="text-accent">Compare fares</span>
+            <QuoteLine quote={quote} />
           )}
         </span>
       </button>
@@ -193,7 +202,7 @@ function FlightLegRow({ leg, label, selected, onSelect, pick }: { leg: Leg; labe
   );
 }
 
-function GroundLegRow({ leg, selected, onSelect, onMode, pick }: { leg: Leg; selected: boolean; onSelect: (id: string) => void; onMode: (m: Mode) => void; pick?: { priceTotal: number; date: string } }) {
+function GroundLegRow({ leg, selected, onSelect, onMode, pick, quote }: { leg: Leg; selected: boolean; onSelect: (id: string) => void; onMode: (m: Mode) => void; pick?: { priceTotal: number; date: string }; quote?: FareQuote }) {
   const est = estimateLeg(leg.from, leg.to, leg.mode);
   const isFlight = leg.mode === "flight";
   const color = isFlight ? "var(--accent)" : "var(--ground)";
@@ -234,7 +243,7 @@ function GroundLegRow({ leg, selected, onSelect, onMode, pick }: { leg: Leg; sel
             {MODE_LABEL[leg.mode]} · {fmtShort(leg.date)}
           </span>
           <span className="data">
-            {formatDuration(est.durationMin)} · {isFlight && pick && pick.date === leg.date ? formatUsd(pick.priceTotal) : `~${formatUsd(est.priceUsd)}`}
+            {formatDuration(est.durationMin)} · {isFlight && pick && pick.date === leg.date ? formatUsd(pick.priceTotal) : isFlight && quote ? `from ${formatUsd(quote.cheapest)}` : `~${formatUsd(est.priceUsd)}`}
           </span>
         </button>
       </div>

@@ -1,5 +1,5 @@
 import "server-only";
-import { consumeSerpapi, serpapiQuota } from "../serpapiQuota";
+import { consumeSerpapi, refreshSerpapiUsage, serpapiQuota } from "../serpapiQuota";
 import { searchLinks } from "./links";
 import { sampleOffers } from "./sample";
 import { serpapiSearch } from "./serpapi";
@@ -24,6 +24,8 @@ const key = (mode: string, q: FlightQuery) =>
   [mode, q.from, q.to, q.date, q.adults, q.cabin, q.directOnly, mode === "live" ? JSON.stringify(q.filter ?? null) : ""].join("|");
 
 export async function searchFlights(q: FlightQuery, mode: "cached" | "live"): Promise<FlightSearchResult> {
+  // Keep the remaining-searches count true to the SerpApi account (free check, cached).
+  await refreshSerpapiUsage();
   const k = key(mode, q);
   const hit = cache.get(k);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS[mode]) return { ...hit.value, liveQuota: liveQuota() };

@@ -10,6 +10,8 @@ export interface AuthState {
   session: Session | null;
   email: string | null;
   userId: string | null;
+  /** The name the traveller chose for their account, if any. */
+  name: string | null;
 }
 
 /** Signed-in state, kept in step with Supabase (including the return from an email sign-in link). */
@@ -52,6 +54,7 @@ export function useAuth(): AuthState {
     session,
     email: session?.user.email ?? null,
     userId: session?.user.id ?? null,
+    name: (session?.user.user_metadata?.name as string | undefined)?.trim() || null,
   };
 }
 
@@ -74,4 +77,29 @@ export async function sendSignInLink(email: string): Promise<string | null> {
 
 export async function signOut() {
   await supabase()?.auth.signOut();
+}
+
+/**
+ * Finish signing in with the code from the email. This keeps sign-in inside the
+ * app you started from (an iPhone home-screen app and Safari don't share sign-ins,
+ * so a link opened in Safari can't sign the app in).
+ */
+export async function verifyCode(email: string, code: string): Promise<string | null> {
+  const sb = supabase();
+  if (!sb) return "Accounts aren't set up yet.";
+  const token = code.replace(/\D/g, "");
+  if (token.length < 6) return "Enter the code from the email (6 digits).";
+  const { error } = await sb.auth.verifyOtp({ email: email.trim(), token, type: "email" });
+  if (!error) return null;
+  if (/expired|invalid/i.test(error.message)) return "That code didn't work or has expired. Check the newest email, or send a new code.";
+  if (/rate|too many/i.test(error.message)) return "Too many tries. Wait a minute and try again.";
+  return error.message;
+}
+
+/** Save the name shown on your account. */
+export async function updateName(name: string): Promise<string | null> {
+  const sb = supabase();
+  if (!sb) return "Accounts aren't set up yet.";
+  const { error } = await sb.auth.updateUser({ data: { name: name.trim().slice(0, 60) } });
+  return error ? error.message : null;
 }

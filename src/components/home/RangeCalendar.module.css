@@ -157,8 +157,9 @@
 
 /* Phones: a full-screen sheet with one month and thumb-sized days. */
 @media (max-width: 600px) {
-  .scrim { background: rgb(10 15 22 / 0.4); }
+  .scrim { background: rgb(10 15 22 / 0.4); z-index: 70; }
   .calendar {
+    z-index: 71;
     position: fixed;
     inset: 0;
     top: 0;
@@ -180,12 +181,22 @@
   .close { display: inline-flex; width: 44px; height: 44px; }
   .months { grid-template-columns: 1fr; gap: 0; }
   .month[data-second] { display: none; }
+  .months[data-list] { display: flex; flex-direction: column; gap: 18px; }
   .navBtn { top: 4px; width: 44px; height: 44px; }
   .navBtn:first-child { left: 0; }
   .navBtn:last-child { right: 0; }
   .day { width: 44px; height: 44px; font-size: 15px; }
   .cell, .blank { height: 48px; }
-  .foot { margin-top: auto; }
+  .foot {
+    position: sticky;
+    bottom: calc(-1 * max(14px, env(safe-area-inset-bottom, 0px)));
+    margin-top: auto;
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 0px));
+    background: var(--surface-solid);
+    z-index: 1;
+  }
   .actions :global(.btn) { min-height: 44px; }
   .actions :global(.btn-primary) { min-width: 120px; }
 }
+
+.more { padding: 16px; text-align: center; font-size: 12.5px; color: var(--ink-3); }

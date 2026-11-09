@@ -21,7 +21,7 @@ export function activeTab(hash: string, landingOpen: boolean): TabId {
   if (hash === "#start") return "home";
   if (hash === "#concierge") return "concierge";
   if (hash.startsWith("#explore-")) return "guide";
-  if (hash === "#trips" || hash === "#shared" || hash === "#share") return "account";
+  if (hash === "#trips" || hash === "#shared" || hash === "#share" || hash === "#account") return "account";
   if (hash === "#trip") return "trip";
   return landingOpen ? "home" : "trip";
 }

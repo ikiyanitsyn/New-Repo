@@ -160,7 +160,8 @@ export const PlanRequest = z.object({
     adults: z.number().int().min(1).max(9),
     cabin: z.string().max(20),
     returnHome: z.boolean(),
-    stops: z.array(z.object({ city: z.string().length(3), nights: z.number().int().min(1).max(30) })).max(10),
+    stops: z.array(z.object({ city: z.string().length(3), nights: z.number().int().min(1).max(30), stopover: z.boolean().optional() })).max(10),
+    tripType: z.enum(["oneway", "round", "multi", "stopover"]).optional(),
     modes: z.array(z.string().max(10)).max(10),
     saved: z.record(z.string(), z.array(z.string().max(120)).max(40)).default({}),
   }),
@@ -169,7 +170,8 @@ export type PlanRequest = z.infer<typeof PlanRequest>;
 
 export interface SavedPlan {
   createdAt: string;
-  source: "gemini" | "sample";
+  /** "manual": started by adding places from the city guide, before any AI plan. */
+  source: "gemini" | "sample" | "manual";
   request: string;
   preferences: string[];
   answers: Record<string, string[]>;

@@ -1,3 +1,4 @@
+import { consumeSerpapi, refundSerpapi, resetSerpapiQuota, serpapiQuota } from "../serpapiQuota";
 import "server-only";
 import { sampleLive, sampleMonths, samplePopular } from "./sample";
 import { exploreDeals } from "./serpapi";
@@ -18,15 +19,8 @@ import type { DealsQuery, DealsResult } from "./types";
 
 const TTL = { analytics: 6 * 3600_000, live: 12 * 3600_000 };
 const cache = new Map<string, { at: number; value: DealsResult }>();
-const liveUsage = { month: "", used: 0 };
-
-const liveLimit = () => Number(process.env.SERPAPI_DEALS_MONTHLY_LIMIT || 20);
-
-function liveQuota() {
-  const month = new Date().toISOString().slice(0, 7);
-  if (liveUsage.month !== month) Object.assign(liveUsage, { month, used: 0 });
-  return { used: liveUsage.used, limit: liveLimit() };
-}
+// Live deals share the one SerpApi allowance with flights and hotels.
+const liveQuota = () => serpapiQuota();
 
 const key = (mode: string, q: DealsQuery) =>
   mode === "live" ? [mode, q.from, q.to ?? "", q.month ?? "", q.nights ?? "", q.adults, q.cabin].join("|") : [mode, q.from, q.to ?? ""].join("|");
@@ -36,7 +30,7 @@ export type DealsMode = "analytics" | "live";
 /** For tests: forget cached answers and the live counter. */
 export function resetDealsCache() {
   cache.clear();
-  Object.assign(liveUsage, { month: "", used: 0 });
+  resetSerpapiQuota();
 }
 
 export async function getDeals(q: DealsQuery, mode: DealsMode, fetcher: typeof fetch = fetch): Promise<DealsResult> {
@@ -57,13 +51,16 @@ export async function getDeals(q: DealsQuery, mode: DealsMode, fetcher: typeof f
     if (quota.used >= quota.limit) {
       return { ...base, source: "serpapi", months: [], popular: [], live: [], liveSource: "serpapi", notices: [`This month's live deal searches are used up (${quota.used}/${quota.limit}).`], liveQuota: quota };
     }
-    liveUsage.used++;
+    if (!consumeSerpapi()) {
+      return { ...base, source: "serpapi", months: [], popular: [], live: [], liveSource: "serpapi", notices: ["This month's live searches are used up."], liveQuota: liveQuota() };
+    }
     try {
       const live = await exploreDeals(q, serpKey, fetcher);
       result = { ...base, source: "serpapi", months: [], popular: [], live, liveSource: "serpapi", liveQuota: liveQuota() };
       if (!live.length) result.notices.push("Google Travel Explore had no prices for this search. Try another month.");
     } catch (e) {
       const message = e instanceof Error ? e.message : "Live deals failed.";
+      refundSerpapi();
       return { ...base, source: "sample", months: [], popular: [], live: sampleLive(q.from), liveSource: "sample", notices: [`${message} Showing sample deals instead.`], liveQuota: liveQuota() };
     }
   } else if (token) {
