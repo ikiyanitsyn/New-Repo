@@ -45,3 +45,25 @@ export function addPlaceToPlan(trip: Trip, place: Place, date: string, time: str
   if (items.some((it) => it.placeName === place.name)) return plan; // already on that day
   return { ...plan, response: insertItem(plan.response, day, item, chronologicalIndex(items, time)) };
 }
+
+/**
+ * Carry the traveller's own items ("Your note") from the previous plan into a freshly written one,
+ * on the same dates, so asking the concierge for an update never loses what they added.
+ */
+export function keepOwnItems(prev: PlanResponse | undefined, next: PlanResponse): PlanResponse {
+  if (!prev) return next;
+  let out = next;
+  for (const day of prev.days) {
+    const at = dayIndexByDate(out, day.date);
+    if (at < 0) continue;
+    for (const item of day.items.filter((it) => it.mine)) {
+      const items = out.days[at].items;
+      if (items.some((it) => it.title === item.title && it.mine)) continue;
+      // The new plan may have used the same place itself; the traveller's own entry wins.
+      const twin = item.placeName ? items.findIndex((it) => it.placeName === item.placeName) : -1;
+      if (twin >= 0) out = { ...out, days: out.days.map((d, i) => (i === at ? { ...d, items: d.items.filter((_, k) => k !== twin) } : d)) };
+      out = insertItem(out, at, item, chronologicalIndex(out.days[at].items, item.time));
+    }
+  }
+  return out;
+}

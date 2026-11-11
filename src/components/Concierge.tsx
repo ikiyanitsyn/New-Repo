@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { keepOwnItems } from "@/lib/planAdd";
 import { findCity } from "@/lib/cities";
 import { fmtShort } from "@/lib/format";
 import type { PlanResponse, SavedPlan } from "@/lib/ai/schema";
@@ -133,6 +134,7 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: 
         tripType: trip.tripType,
         modes: legs.filter((l) => l.kind === "between").map((l) => l.mode),
         saved: Object.fromEntries(Object.entries(trip.saved ?? {}).map(([c, list]) => [c, list.map((p) => p.name)])),
+        hotels: Object.fromEntries(Object.entries(trip.hotels ?? {}).map(([c, h]) => [c, h.name.slice(0, 160)])),
       },
     };
     try {
@@ -150,7 +152,7 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: 
         preferences: prefs,
         answers,
         forStops: stopSignature(trip),
-        response: j.response as PlanResponse,
+        response: keepOwnItems(trip.plan?.response, j.response as PlanResponse),
         official: j.official ?? [],
         models: j.models,
         usedBackup: j.usedBackup,
@@ -158,6 +160,8 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: 
       };
       dispatch({ type: "plan", plan: saved });
       setView("days");
+      // On phones the plan sits below the form: bring it into view.
+      requestAnimationFrame(() => document.querySelector(".concierge-plan")?.scrollIntoView({ behavior: "smooth", block: "start" }));
     } catch (e) {
       if (controller.signal.aborted && controller.signal.reason === "cancel") {
         setInfo(hadPlan ? "Stopped. Your previous plan is unchanged." : "Stopped. Nothing was changed.");
@@ -247,7 +251,7 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: 
           ) : (
             <p className="text-center text-[12.5px] text-ink-3">
               Uses your route, dates and saved places.
-              {resp && " Updating writes a fresh plan and replaces any edits you made."}
+              {resp && " Updating writes a fresh plan. Places you added yourself are kept; other edits are replaced."}
             </p>
           )}
           {error && <p className="rounded-md px-3 py-2 text-[13.5px] text-[var(--bad)]" style={{ background: "var(--surface-sunk)" }}>{error}</p>}

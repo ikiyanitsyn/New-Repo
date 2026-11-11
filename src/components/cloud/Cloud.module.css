@@ -95,6 +95,7 @@
   flex: 1;
   min-width: 0;
   height: 44px;
+  min-height: 44px; /* in a column layout, flex: 1 would otherwise squash it */
   padding-inline: 14px;
   border-radius: 10px;
   border: 1px solid var(--line-strong);

@@ -19,6 +19,7 @@ interface Props {
 interface Calendar {
   source: "travelpayouts" | "sample";
   days: DayPrice[];
+  nearby?: DayPrice[];
   notices: string[];
 }
 
@@ -89,6 +90,20 @@ export function PriceStrip({ from, to, date, adults, cabin, editable, onPickDate
           );
         })}
       </div>
+      {data?.nearby?.length ? (
+        <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-ink-2" data-testid="nearby-fares">
+          <span>No recent fare for {dayNum(date)}. Closest:</span>
+          {data.nearby.map((d) =>
+            editable ? (
+              <button key={d.date} type="button" className="chip chip-accent" title={`Fly on ${dayNum(d.date)} instead`} onClick={() => onPickDate(d.date)}>
+                {weekday(d.date)} {dayNum(d.date)} · {formatUsd(d.price!)}
+              </button>
+            ) : (
+              <span key={d.date} className="chip chip-muted">{weekday(d.date)} {dayNum(d.date)} · {formatUsd(d.price!)}</span>
+            ),
+          )}
+        </div>
+      ) : null}
       <p className="text-[11.5px] leading-snug text-ink-3">
         {editable
           ? "Tap a day to move your departure. Every later city shifts with it."

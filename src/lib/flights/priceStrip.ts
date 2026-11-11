@@ -46,3 +46,23 @@ export function cheapestDayIndex(days: DayPrice[]): number {
   });
   return at;
 }
+
+/**
+ * The dates closest to `date` that have a fare (lowest price on each), nearest first.
+ * Used when the asked date itself has none, to point the traveller at days that do.
+ */
+export function nearestDayPrices(fares: DatedFare[], date: string, maxDays = 21, count = 3, notBefore = ""): DayPrice[] {
+  const best = new Map<string, number>();
+  for (const f of fares) {
+    const day = f.departure_at.slice(0, 10);
+    if (!(f.price > 0) || day === date || day < notBefore) continue;
+    if (!best.has(day) || f.price < best.get(day)!) best.set(day, f.price);
+  }
+  const t = new Date(date + "T00:00:00Z").getTime();
+  const gap = (d: string) => Math.abs(new Date(d + "T00:00:00Z").getTime() - t) / 86400000;
+  return [...best.entries()]
+    .filter(([d]) => gap(d) <= maxDays)
+    .sort((a, b) => gap(a[0]) - gap(b[0]) || a[0].localeCompare(b[0]))
+    .slice(0, count)
+    .map(([d, price]) => ({ date: d, price }));
+}

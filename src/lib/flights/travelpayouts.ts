@@ -1,6 +1,11 @@
 import { flightCodeOf, getCity } from "../cities";
 import { airlineName } from "./airlines";
+import { monthsAround } from "./priceStrip";
 import type { FlightOffer, FlightQuery } from "./types";
+
+/** How far from the asked date a cached fare may be and still be shown as a guide. */
+const NEARBY_DAYS = 14;
+const shortDate = (iso: string) => new Date(iso + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 /**
  * Travelpayouts (Aviasales) Data API — free with an affiliate token.
@@ -63,13 +68,21 @@ export async function travelpayoutsSearch(
   let items = await call(q, q.date, token);
 
   if (items.length === 0) {
-    // Cached data is sparse for exact dates; widen to the month and keep ±3 days.
-    const month = q.date.slice(0, 7);
+    // Cached data is sparse for exact dates; widen to the months around it and keep the closest dates.
     const target = new Date(q.date + "T00:00:00Z").getTime();
-    items = (await call(q, month, token)).filter(
-      (it) => Math.abs(new Date(it.departure_at.slice(0, 10) + "T00:00:00Z").getTime() - target) <= 3 * 86400000,
-    );
-    if (items.length) notices.push("No cached fares for this exact date, so these are from within 3 days of it.");
+    const dist = (it: TpItem) => Math.abs(new Date(it.departure_at.slice(0, 10) + "T00:00:00Z").getTime() - target) / 86400000;
+    const pool = (await Promise.all(monthsAround(q.date, NEARBY_DAYS).map((m) => call(q, m, token).catch(() => [] as TpItem[])))).flat();
+    const nearest = Math.min(...pool.map(dist));
+    if (nearest <= NEARBY_DAYS) {
+      // Within 3 days, show them all; further out, only the closest date (and the day next to it).
+      items = pool.filter((it) => dist(it) <= Math.max(3, nearest + 1));
+      const dates = [...new Set(items.map((it) => it.departure_at.slice(0, 10)))].sort();
+      notices.push(
+        nearest <= 3
+          ? "No recent fares for this exact date, so these are from within 3 days of it."
+          : `No recent fares near this date. These are the closest we have (${dates.map(shortDate).join(", ")}): use them as a guide, or check live prices for your date.`,
+      );
+    }
   }
 
   const toCity = getCity(q.to);

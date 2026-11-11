@@ -2,7 +2,7 @@ import "server-only";
 import { flightCodeOf, getCity } from "../cities";
 import { addDays } from "../trip";
 import { sampleOffers } from "./sample";
-import { monthsAround, pickDayPrices, type DatedFare, type DayPrice } from "./priceStrip";
+import { monthsAround, nearestDayPrices, pickDayPrices, type DatedFare, type DayPrice } from "./priceStrip";
 import { travelpayoutsMonth } from "./travelpayouts";
 import type { Cabin } from "./types";
 
@@ -18,6 +18,8 @@ export interface CalendarResult {
   source: "travelpayouts" | "sample";
   /** Seven days around the leg date; `price` is the lowest total for all travellers. */
   days: DayPrice[];
+  /** When the leg date has no fare: the closest dates that do (nearest first). */
+  nearby?: DayPrice[];
   notices: string[];
 }
 
@@ -51,11 +53,19 @@ export async function priceCalendar(q: CalendarQuery): Promise<CalendarResult> {
   try {
     const origin = flightCodeOf(getCity(q.from));
     const destination = flightCodeOf(getCity(q.to));
-    const fares = (await Promise.all(monthsAround(q.date).map((m) => monthFares(origin, destination, m, token)))).flat();
+    const near = monthsAround(q.date);
+    const fares = (await Promise.all(near.map((m) => monthFares(origin, destination, m, token)))).flat();
     // Cached fares are economy, per person; show the total for the party.
     const days = pickDayPrices(fares, q.date).map((d) => ({ ...d, price: d.price === null ? null : d.price * q.adults }));
     const notices = q.cabin !== "economy" ? ["Day prices are economy fares."] : [];
-    return { source: "travelpayouts", days, notices };
+    // No fare on the leg date: look up to three weeks either side for the closest dates that have one.
+    let nearby: DayPrice[] | undefined;
+    if (days[3]?.price === null) {
+      const wider = monthsAround(q.date, 21).filter((m) => !near.includes(m));
+      const more = (await Promise.all(wider.map((m) => monthFares(origin, destination, m, token).catch(() => [] as DatedFare[])))).flat();
+      nearby = nearestDayPrices([...fares, ...more], q.date, 21, 3, new Date().toISOString().slice(0, 10)).map((d) => ({ ...d, price: d.price! * q.adults }));
+    }
+    return { source: "travelpayouts", days, ...(nearby?.length ? { nearby } : {}), notices };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Price calendar failed.";
     return { source: "sample", days: sampleDays(q), notices: [`${message} Showing sample prices instead.`] };

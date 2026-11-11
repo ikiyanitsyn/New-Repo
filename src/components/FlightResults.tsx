@@ -127,7 +127,7 @@ export function FlightResults({ leg, trip, pick, onPick, onPickDate, onCollapse,
         )}
         {loading && !data && Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton mx-2 h-[76px]" />)}
         {error && <p className="mx-2 text-[13px] text-[var(--bad)]">{error}. Try again in a moment.</p>}
-        {!loading && data && sorted.length === 0 && (
+        {!loading && data && sorted.length === 0 && !(isDefaultFilter(filter) && data.notices.length > 0) && (
           <p className="mx-2 py-6 text-center text-[13.5px] text-ink-2">
             {isDefaultFilter(filter) ? "No fares found for this date." : "No fares match your stops and layover choices."}
             {!isDefaultFilter(filter) && (
@@ -143,6 +143,7 @@ export function FlightResults({ leg, trip, pick, onPick, onPickDate, onCollapse,
             <OfferRow
               key={o.id}
               offer={o}
+              legDate={leg.date}
               adults={trip.adults}
               cabin={trip.cabin}
               rankLabel={i === 0 ? (sort === "best" ? "Best balance" : sort === "cheapest" ? "Cheapest" : "Fastest") : null}
@@ -192,9 +193,9 @@ export function FlightResults({ leg, trip, pick, onPick, onPickDate, onCollapse,
 }
 
 function OfferRow({
-  offer: o, adults, cabin, rankLabel, isCheapest, isFastest, onFrontier, chosen, onChoose,
+  offer: o, legDate, adults, cabin, rankLabel, isCheapest, isFastest, onFrontier, chosen, onChoose,
 }: {
-  offer: FlightOffer; adults: number; cabin: Cabin; rankLabel: string | null; isCheapest: boolean; isFastest: boolean; onFrontier: boolean; chosen: boolean; onChoose: () => void;
+  offer: FlightOffer; legDate: string; adults: number; cabin: Cabin; rankLabel: string | null; isCheapest: boolean; isFastest: boolean; onFrontier: boolean; chosen: boolean; onChoose: () => void;
 }) {
   const first = o.segments[0];
   const last = o.segments[o.segments.length - 1];
@@ -208,6 +209,7 @@ function OfferRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="truncate text-[13.5px] font-semibold">{o.airlines.join(" + ")}</span>
+            {o.departLocal.slice(0, 10) !== legDate && <span className="chip chip-warn" title="This fare is for a different day than your flight">{fmtDay(o.departLocal.slice(0, 10))}</span>}
             {rankLabel && <span className="chip chip-accent">{rankLabel}</span>}
             {!rankLabel && isCheapest && <span className="chip chip-muted">Cheapest</span>}
             {!rankLabel && isFastest && <span className="chip chip-muted">Fastest</span>}

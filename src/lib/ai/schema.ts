@@ -164,6 +164,8 @@ export const PlanRequest = z.object({
     tripType: z.enum(["oneway", "round", "multi", "stopover"]).optional(),
     modes: z.array(z.string().max(10)).max(10),
     saved: z.record(z.string(), z.array(z.string().max(120)).max(40)).default({}),
+    /** The hotel the traveller chose in each city (city code → hotel name). */
+    hotels: z.record(z.string().length(3), z.string().max(160)).default({}),
   }),
 });
 export type PlanRequest = z.infer<typeof PlanRequest>;

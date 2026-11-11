@@ -535,7 +535,7 @@ h1, h2, h3 {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgb(10 14 20 / 0.35) 0%, rgb(10 14 20 / 0.05) 40%, rgb(10 14 20 / 0.7) 100%);
+  background: linear-gradient(180deg, rgb(10 14 20 / 0.5) 0%, rgb(10 14 20 / 0.3) 40%, rgb(10 14 20 / 0.82) 100%);
 }
 .explorer-hero > * { position: relative; }
 .explorer-hero-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -849,9 +849,8 @@ a.provider-credit { text-decoration: underline; text-underline-offset: 2px; }
   .picks { grid-auto-columns: 80%; }
   .map-toggle {
     position: fixed;
-    left: 50%;
+    right: 14px; /* in the corner, clear of the buttons in the middle of the page */
     bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-    transform: translateX(-50%);
     z-index: 45;
     display: inline-flex;
     align-items: center;

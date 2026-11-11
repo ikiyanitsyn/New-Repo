@@ -128,7 +128,7 @@ export const RULES: Rule[] = [
       if (!dest) return null;
       const p = programmesFor(ctx.search.home, dest).find((x) => x.hubCity && !has(ctx, x.hubCity) && x.id !== "china-transit");
       if (!p) return null;
-      return { text: `${p.airline} offers a ${p.hubName} stopover on routes like this.`, action: { kind: "stopover", programme: p.id, label: "Plan with it" } };
+      return { text: `${p.airline} offers ${/^[AEIOU]/.test(p.hubName) ? "an" : "a"} ${p.hubName} stopover on routes like this.`, action: { kind: "stopover", programme: p.id, label: "Plan with it" } };
     },
   },
   {

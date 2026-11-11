@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { sendSignInLink, verifyCode } from "@/lib/cloud/auth";
+import { sendSignInLink, takeLinkFailed, verifyCode } from "@/lib/cloud/auth";
 import s from "./Cloud.module.css";
 
 /**
@@ -14,6 +14,8 @@ export function SignInForm({ onDone, autoFocus = true }: { onDone?: () => void; 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  // Arrived from an email link that couldn't sign this browser in.
+  const [linkFailed] = useState(() => takeLinkFailed());
   const emailRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
 
@@ -84,6 +86,11 @@ export function SignInForm({ onDone, autoFocus = true }: { onDone?: () => void; 
 
   return (
     <form onSubmit={send} className="flex flex-col gap-4">
+      {linkFailed && (
+        <p className={s.error} role="alert">
+          That sign-in link couldn&rsquo;t sign you in here. Links only work in the same browser or app that asked for them, and only once. Enter your email below and type the 6-digit code from the new email instead.
+        </p>
+      )}
       <label htmlFor="signin-email" className="sr-only">Email</label>
       <input
         ref={emailRef}

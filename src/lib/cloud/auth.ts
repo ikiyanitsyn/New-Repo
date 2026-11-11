@@ -14,6 +14,14 @@ export interface AuthState {
   name: string | null;
 }
 
+let linkFailed = false;
+/** True once when the page was opened from a sign-in link that didn't work here. */
+export function takeLinkFailed(): boolean {
+  const was = linkFailed;
+  linkFailed = false;
+  return was;
+}
+
 /** Signed-in state, kept in step with Supabase (including the return from an email sign-in link). */
 export function useAuth(): AuthState {
   const [session, setSession] = useState<Session | null>(null);
@@ -27,6 +35,15 @@ export function useAuth(): AuthState {
       if (!alive) return;
       setSession(data.session);
       setReady(true);
+      // A sign-in link that couldn't sign this browser in (opened in a different browser or app
+      // than the one that asked for it, or expired): say so on the account page instead of nothing.
+      const url = new URL(window.location.href);
+      if (!data.session && (url.searchParams.has("code") || url.searchParams.has("error_description"))) {
+        linkFailed = true;
+        for (const k of ["code", "error", "error_code", "error_description"]) url.searchParams.delete(k);
+        history.replaceState(null, "", url.pathname + url.search + "#account");
+        window.dispatchEvent(new HashChangeEvent("hashchange"));
+      }
     });
     const { data: sub } = sb.auth.onAuthStateChange((event, s) => {
       setSession(s);

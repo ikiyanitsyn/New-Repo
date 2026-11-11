@@ -9,7 +9,7 @@ import { hotelBookingUrl, parseTypedPrice, toChosenHotel } from "@/lib/hotels/ch
 import { fmtChecked, fmtUsd, nightlyLine, pinPriceLabel } from "@/lib/hotels/format";
 import { isLivePlaceId, livePlace, matchHotels } from "@/lib/hotels/match";
 import type { HotelsResult, HotelsStatus, LiveHotel } from "@/lib/hotels/types";
-import { fmtCount, priceShort, priceSymbol, stayPinLabel } from "@/lib/places/display";
+import { approxUsd, fmtCount, priceShort, priceSymbol, stayPinLabel } from "@/lib/places/display";
 import { placeLinks, staySearchLinks, type OutLink } from "@/lib/places/links";
 import { findPlaceByName, nameSimilarity } from "@/lib/places/match";
 import { featureScore, picksFor, subcategoryOf, subcategoryOrder } from "@/lib/places/subcategory";
@@ -325,6 +325,7 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
     isStays ? (
       <StayCard
         key={p.id}
+        country={city.country}
         place={p}
         label={label}
         sub={subcategoryOf(p)}
@@ -397,6 +398,7 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
         <div key={`${city.code}-${tab}-${detailId ?? ""}`} className={`explorer-body scroll-y explorer-slide-${direction}`}>
           {detail ? (
             <PlaceDetail
+              country={city.country}
               place={detail}
               sub={subcategoryOf(detail)}
               rating={ratings[detail.id]}
@@ -714,11 +716,12 @@ interface CardProps {
 }
 
 /** A stay, listing-card style: big photo, name and rating, a short hook, the price. */
-function StayCard({ place: p, label, sub, rating, live, chosen, onChoose, saved, onSave, onOpen, onHover }: CardProps & {
-  label?: string; sub: string; live?: LiveHotel; chosen: boolean; onChoose?: () => void;
+function StayCard({ place: p, label, sub, rating, live, chosen, onChoose, saved, onSave, onOpen, onHover, country }: CardProps & {
+  label?: string; sub: string; live?: LiveHotel; chosen: boolean; onChoose?: () => void; country?: string;
 }) {
   const [imgOk, setImgOk] = useState(true);
   const price = priceShort(p.price);
+  const usd = approxUsd(price, country);
   const symbol = priceSymbol(p, rating);
   const shownRating: PlaceRating | null | undefined =
     rating?.rating !== undefined || live?.rating === undefined ? rating : { rating: live.rating, count: live.reviews, reviews: [] };
@@ -750,7 +753,7 @@ function StayCard({ place: p, label, sub, rating, live, chosen, onChoose, saved,
         ) : (
           (price || symbol) && (
             <div className="stay-price">
-              {price ? <><strong>{price}</strong> a night</> : <><strong className="data">{symbol}</strong> {p.tier ?? ""}</>}
+              {price ? <><strong>{price}</strong> a night{usd && <span className="price-src"> · about {usd}</span>}</> : <><strong className="data">{symbol}</strong> {p.tier ?? ""}</>}
             </div>
           )
         )}
@@ -894,17 +897,17 @@ function AddToPlan({ stop, onAdd }: { stop: StopWithDates; onAdd: (date: string,
   );
 }
 
-function PlaceDetail({ place: p, sub, rating, ratingPending, provider, saved, onSave, onBack, backLabel, links, live, livePricedAt, nights, chosen, chosenSource, onChoose, addToPlan }: {
+function PlaceDetail({ place: p, sub, rating, ratingPending, provider, saved, onSave, onBack, backLabel, links, live, livePricedAt, nights, chosen, chosenSource, onChoose, addToPlan, country }: {
   place: Place; sub: string; rating?: PlaceRating | null; ratingPending: boolean; provider: RatingsProviderInfo | null;
   saved: boolean; onSave: () => void; onBack: () => void; backLabel: string; links: OutLink[];
-  live?: LiveHotel; livePricedAt?: string; nights: number; chosen: boolean; chosenSource?: ChosenHotel["source"];
+  live?: LiveHotel; livePricedAt?: string; nights: number; chosen: boolean; chosenSource?: ChosenHotel["source"]; country?: string;
   /** Present for stays when choosing is possible. `manual` is a price the traveller typed in. */
   onChoose?: (manual?: number) => void;
   addToPlan?: { stop: StopWithDates; onAdd: (date: string, time: string) => boolean };
 }) {
   const [imgOk, setImgOk] = useState(true);
   const facts: [string, string | undefined][] = [
-    ["Price", p.price],
+    ["Price", p.price && approxUsd(priceShort(p.price), country) ? `${p.price} (about ${approxUsd(priceShort(p.price), country)})` : p.price],
     ["Hours", p.hours],
     ["Check-in", p.checkin && p.checkout ? `${p.checkin} · check-out ${p.checkout}` : p.checkin],
     ["Address", p.address],

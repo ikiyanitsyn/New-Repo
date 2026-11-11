@@ -42,6 +42,11 @@ export function LegPanel({ leg, trip, onMode, onPick, onDate, onNextLeg, collaps
     nextRef.current = onNextLeg;
   });
   useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
+  // The "choose a hotel" card sits under the fares: bring it into view when it appears.
+  const nextCard = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (allChosen) nextCard.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [allChosen]);
 
   const choose = (legId: string, pick: FlightPick | null) => {
     onPick(legId, pick);
@@ -89,7 +94,7 @@ export function LegPanel({ leg, trip, onMode, onPick, onDate, onNextLeg, collaps
           <GroundDetail leg={leg} adults={trip.adults} onMode={(m) => onMode(leg.id, m)} onCollapse={onCollapse} />
         )}
         {allChosen && onStays && (
-          <div className="mx-4 mb-3 flex flex-col gap-2 rounded-xl border px-4 py-3" style={{ borderColor: "var(--accent)", background: "var(--accent-soft)" }}>
+          <div ref={nextCard} className="mx-4 mb-3 flex flex-col gap-2 rounded-xl border px-4 py-3" style={{ borderColor: "var(--accent)", background: "var(--accent-soft)" }}>
             <div className="text-[14px] font-medium">All flights chosen. Next, where you&apos;ll stay.</div>
             <div className="flex flex-wrap gap-2">
               <button type="button" className="btn btn-primary !h-9" onClick={() => { setAllChosen(false); onStays(); }}>

@@ -159,7 +159,17 @@ function travellerBlock(r: PlanRequest): string {
 Preferences: ${r.preferences.join(", ") || "(none chosen)"}
 Answers to earlier questions: ${answers || "(none)"}
 Travellers: ${r.trip.adults} adult${r.trip.adults > 1 ? "s" : ""} from ${getCity(r.trip.home).name}, US passports. Leaving ${r.trip.departDate}.
-Trip type: ${TRIP_TYPE_TEXT[r.trip.tripType ?? (r.trip.returnHome ? (r.trip.stops.length > 1 ? "multi" : "round") : "oneway")]}.${stopoverBlock(r)}`;
+Trip type: ${TRIP_TYPE_TEXT[r.trip.tripType ?? (r.trip.returnHome ? (r.trip.stops.length > 1 ? "multi" : "round") : "oneway")]}.${stopoverBlock(r)}
+${hotelBlock(r)}`;
+}
+
+/** The hotels already chosen, so check-ins name the right one and no other hotel is invented. */
+function hotelBlock(r: PlanRequest): string {
+  const cities = [...new Set(r.trip.stops.map((s) => s.city))];
+  const chosen = cities.filter((c) => r.trip.hotels?.[c]).map((c) => `${getCity(c).name}: ${r.trip.hotels[c]}`);
+  return chosen.length
+    ? `Hotels the traveller has chosen: ${chosen.join("; ")}. Use exactly these for check-in items. In any other city write "Check in to your hotel" without naming one.`
+    : `The traveller has not chosen hotels yet: write "Check in to your hotel" without naming a hotel.`;
 }
 
 const TRIP_TYPE_TEXT = {
@@ -250,7 +260,13 @@ Rules:
       .filter((_, i) => i % chunk.parts !== chunk.part)
       .slice(0, 8)
       .map((p) => p.name);
-    others = `\nOther days in ${city.name} are planned separately${elsewhere.length ? ` and already cover: ${elsewhere.join("; ")}. Don't repeat those` : ". Don't repeat the most famous sights on every part"}.`;
+    const share = `Other days in ${city.name} are planned separately${elsewhere.length ? ` and already cover: ${elsewhere.join("; ")}. Don't repeat those` : ""}.`;
+    // The parts are written at the same time and can't see each other, so say who gets the headline sights.
+    const headline =
+      chunk.part === 0
+        ? `Your days are the first in ${city.name}: you plan the city's single most famous sight and its classic day trip (if any), once each.`
+        : `Earlier days in ${city.name} already include the city's single most famous sight and its classic day trip (for example the Great Wall from Beijing, or Nara from Kyoto). Do NOT plan those again, and do not reuse the neighbourhood walks a first-time visitor does on day one or two. Build your days from your candidate list and lesser-known areas instead, and give each day a clearly different theme.`;
+    others = `\n${share} ${headline}\n`;
   }
   const user = `${travellerBlock(r)}
 Whole route: ${routeLine(r)}
