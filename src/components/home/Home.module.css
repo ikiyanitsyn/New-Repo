@@ -380,7 +380,9 @@ button.dealCard:hover { border-color: var(--ink-3); box-shadow: var(--shadow); }
     animation: sheet-up 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
   }
   @keyframes sheet-up { from { transform: translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
-  .popScrim { background: rgb(10 15 22 / 0.4); }
+  /* Above the bottom tab bar (z 50/51), so the Done button can be reached. */
+  .popScrim { background: rgb(10 15 22 / 0.4); z-index: 70; }
+  .pop { z-index: 71; }
   .popClose { display: inline-flex; width: 44px; height: 44px; }
   .popFoot :global(.btn) { width: 100%; min-height: 46px; }
   .cabin { min-height: 44px; }

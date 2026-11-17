@@ -10,7 +10,8 @@ import { fmtChecked, fmtUsd, nightlyLine, pinPriceLabel } from "@/lib/hotels/for
 import { isLivePlaceId, livePlace, matchHotels } from "@/lib/hotels/match";
 import type { HotelsResult, HotelsStatus, LiveHotel } from "@/lib/hotels/types";
 import { approxUsd, fmtCount, priceShort, priceSymbol, stayPinLabel } from "@/lib/places/display";
-import { placeLinks, staySearchLinks, type OutLink } from "@/lib/places/links";
+import { placeParam } from "@/lib/places/customParam";
+import { outdoorsy, placeLinks, staySearchLinks, type OutLink } from "@/lib/places/links";
 import { findPlaceByName, nameSimilarity } from "@/lib/places/match";
 import { featureScore, picksFor, subcategoryOf, subcategoryOrder } from "@/lib/places/subcategory";
 import {
@@ -125,7 +126,7 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
 
   useEffect(() => {
     const ctrl = new AbortController();
-    fetch(`/api/places?city=${city.code}`, { signal: ctrl.signal })
+    fetch(`/api/places?${new URLSearchParams({ city: city.code, ...placeParam(city.code) })}`, { signal: ctrl.signal })
       .then(async (r) => {
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || "Couldn't load places");
@@ -143,7 +144,9 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
   const asked = useRef(new Set<string>());
 
   // Live hotel prices: only when the traveller asks (each ask spends one of the monthly SerpApi searches).
-  const liveKey = `${city.code}|${stop.arrive}|${stop.depart}|${adults}`;
+  // Hotels or vacation rentals (cabins, houses): rentals first for parks, forests and lakes.
+  const [liveKind, setLiveKind] = useState<"hotels" | "rentals">(() => (outdoorsy(city) ? "rentals" : "hotels"));
+  const liveKey = `${city.code}|${stop.arrive}|${stop.depart}|${adults}${liveKind === "rentals" ? "|rentals" : ""}`;
   const [live, setLive] = useState<{ key: string; phase: "loading" | "ok" | "error"; data?: HotelsResult; error?: string } | null>(null);
   const [hstatus, setHstatus] = useState<HotelsStatus | null>(null);
   useEffect(() => {
@@ -162,7 +165,10 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
   const showLive = () => {
     const key = liveKey;
     setLive({ key, phase: "loading" });
-    const qs = new URLSearchParams({ city: city.code, checkin: stop.arrive, checkout: stop.depart, adults: String(adults) });
+    const qs = new URLSearchParams({
+      city: city.code, checkin: stop.arrive, checkout: stop.depart, adults: String(adults),
+      ...(liveKind === "rentals" ? { rentals: "1" } : {}), ...placeParam(city.code),
+    });
     fetch(`/api/hotels?${qs}`)
       .then(async (r) => {
         const j = await r.json();
@@ -243,7 +249,7 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
       const batch = ids.slice(i, i + RATINGS_BATCH).sort();
       batch.forEach((id) => asked.current.add(`${code}:${id}`));
       // Not aborted on re-render: these ids are marked as asked, so the answer must land.
-      fetch(`/api/places/ratings?city=${code}&ids=${batch.join(",")}`)
+      fetch(`/api/places/ratings?${new URLSearchParams({ city: code, ids: batch.join(","), ...placeParam(code) })}`)
         .then((r) => (r.ok ? (r.json() as Promise<RatingsResult>) : null))
         .then((j) => {
           if (!j) return;
@@ -454,10 +460,14 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
                       </a>
                     ))}
                   </div>
+                  <div className="segmented self-start" role="group" aria-label="Live prices for">
+                    <button type="button" aria-pressed={liveKind === "hotels"} onClick={() => setLiveKind("hotels")}>Hotels</button>
+                    <button type="button" aria-pressed={liveKind === "rentals"} onClick={() => setLiveKind("rentals")}>Vacation rentals</button>
+                  </div>
                   <div className="live-row">
                     {liveData ? (
                       <p className="live-note">
-                        <strong>Live prices</strong> from Google Hotels (via SerpApi), checked {fmtChecked(liveData.fetchedAt)}.
+                        <strong>Live {liveKind === "rentals" ? "vacation rental" : ""} prices</strong> from Google Hotels (via SerpApi), checked {fmtChecked(liveData.fetchedAt)}.{liveKind === "rentals" ? " Rentals are listed below the guide's picks." : ""}
                         Taxes and fees are included where Google shows them. Prices change, so confirm when you book.
                       </p>
                     ) : hstatus?.available === false ? (
@@ -465,7 +475,7 @@ export function CityExplorer({ stops, stopId, adults, saved, onToggleSave, onNav
                     ) : (
                       <>
                         <button type="button" className="btn !h-10" disabled={liveLoading || !hstatus} onClick={showLive}>
-                          {liveLoading ? "Checking prices…" : "Show live prices"}
+                          {liveLoading ? "Checking prices…" : liveKind === "rentals" ? "Show live rentals" : "Show live prices"}
                         </button>
                         {liveLoading && <PlaneLoader label="Checking hotel prices" />}
                         {hstatus && <span className="live-note">Uses 1 of {Math.max(0, hstatus.quota.limit - hstatus.quota.used)} searches left this month.</span>}

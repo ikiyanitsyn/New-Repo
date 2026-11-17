@@ -71,12 +71,12 @@ export function mapProperty(p: SerpProperty): LiveHotel | null {
   };
 }
 
-/** Hotels from a response, without vacation rentals, and without duplicates by name. */
-export function mapHotelsResponse(json: SerpHotelsResponse): LiveHotel[] {
+/** Hotels (or, with `rentals`, vacation rentals only) from a response, without duplicates by name. */
+export function mapHotelsResponse(json: SerpHotelsResponse, rentals = false): LiveHotel[] {
   const seen = new Set<string>();
   const out: LiveHotel[] = [];
   for (const p of json.properties ?? []) {
-    if (p.type && /rental/i.test(p.type)) continue;
+    if (!rentals && p.type && /rental/i.test(p.type)) continue;
     const h = mapProperty(p);
     if (!h) continue;
     const k = h.name.toLowerCase();
@@ -90,7 +90,9 @@ export function mapHotelsResponse(json: SerpHotelsResponse): LiveHotel[] {
 export function hotelsUrl(q: HotelsQuery, city: City, apiKey: string): string {
   const params = new URLSearchParams({
     engine: "google_hotels",
-    q: `Hotels in ${city.name}, ${city.countryName}`,
+    // A searched place is often a park or a lake: ask for places to stay near it, in its state.
+    q: `${q.rentals ? "Vacation rentals" : "Hotels"} ${city.custom ? "near" : "in"} ${city.name}, ${city.area ?? city.countryName}`,
+    ...(q.rentals ? { vacation_rentals: "true" } : {}),
     check_in_date: q.checkin,
     check_out_date: q.checkout,
     adults: String(q.adults),
@@ -106,5 +108,5 @@ export async function serpapiHotels(q: HotelsQuery, city: City, apiKey: string, 
   const res = await fetchImpl(hotelsUrl(q, city, apiKey), { signal: AbortSignal.timeout(25000) });
   const json = (await res.json()) as SerpHotelsResponse;
   if (!res.ok || json.error) throw new Error(json.error || `SerpApi responded ${res.status}`);
-  return mapHotelsResponse(json);
+  return mapHotelsResponse(json, q.rentals);
 }

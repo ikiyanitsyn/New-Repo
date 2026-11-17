@@ -62,6 +62,8 @@ export function sanitize(resp: PlanResponse, r: PlanRequest): PlanResponse {
   return {
     ...resp,
     days: slots.length ? resp.days.filter((d) => slotDates.has(d.date) && findCity(d.city)) : [],
+    // Only bases for stops on this trip.
+    stays: (resp.stays ?? []).filter((x) => r.trip.stops.some((s) => s.city === x.city)),
     routeSuggestion: resp.routeSuggestion
       ? { ...resp.routeSuggestion, stops: resp.routeSuggestion.stops.filter((s) => findCity(s.city) && findCity(s.city)!.country !== "US") }
       : null,
@@ -258,6 +260,7 @@ export async function writePlan(
     questions: overview?.questions ?? [],
     routeSuggestion: overview?.routeSuggestion ?? null,
     beforeYouGo: overview?.beforeYouGo ?? [],
+    stays: overview?.stays ?? [],
     days: dropRepeats(linkDays(written, placesByCity)),
   };
   return {

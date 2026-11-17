@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, type Dispatch } from "react";
-import { DESTINATION_CITIES } from "@/lib/cities";
+import { DESTINATION_CITIES, HOME_CITIES } from "@/lib/cities";
 import { estimateLeg, MODES, type Mode } from "@/lib/ground";
 import { formatDuration, formatMiles, formatUsd } from "@/lib/geo";
 import { fmtShort } from "@/lib/format";
-import { stopsWithDates, tripNights, type FlightPick, type Leg, type Trip } from "@/lib/trip";
+import { isStayTrip, stopsWithDates, tripNights, type FlightPick, type Leg, type Trip } from "@/lib/trip";
+import { customPlaceOf } from "@/lib/cities";
 import type { TripAction } from "@/lib/tripReducer";
 import { CityPicker } from "./CityPicker";
 import { BudgetFooter } from "./planner/BudgetFooter";
@@ -34,6 +35,7 @@ export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, 
   const legById = new Map(legs.map((l) => [l.id, l]));
   const outbound = legById.get("outbound");
   const ret = legById.get("return");
+  const stay = isStayTrip(trip);
 
   return (
     <section className="panel builder" aria-label="Itinerary">
@@ -49,10 +51,10 @@ export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, 
         <p className="text-[13px] text-ink-2">
           {stops.length > 0 ? (
             <>
-              {nights} nights · {stops.length} {stops.length === 1 ? "city" : "cities"}
+              {nights} nights · {stay ? (stops.length === 1 ? "no flights" : `${stops.length} places, no flights`) : `${stops.length} ${stops.length === 1 ? "city" : "cities"}`}
             </>
           ) : (
-            "Add the city you fly into to begin."
+            stay ? "Add where you're staying to begin." : "Add the city you fly into to begin."
           )}
         </p>
         <button type="button" onClick={onConcierge} className="btn mt-1 self-start !h-9 !text-[13.5px]" style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>
@@ -62,7 +64,7 @@ export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, 
 
       <div className="scroll-y flex min-h-0 flex-1 flex-col gap-5 px-5 py-4">
         <TripSummary trip={trip} />
-        {allFares && <AllFares count={legs.filter((l) => l.mode === "flight").length} state={allFares} />}
+        {allFares && !stay && <AllFares count={legs.filter((l) => l.mode === "flight").length} state={allFares} />}
 
         {/* Route timeline */}
         <ol className="relative flex flex-col" aria-label="Route">
@@ -73,7 +75,7 @@ export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, 
           {stops.map((s, i) => {
             const next = stops[i + 1];
             const leg = next ? legById.get(`${s.id}>${next.id}`) : undefined;
-            const role = i === 0 ? "Fly in" : i === stops.length - 1 ? "Fly out" : `Stop ${i + 1}`;
+            const role = stay ? (i === 0 ? "Check in" : `Then ${s.cityInfo.kind ?? "stay"}`) : i === 0 ? "Fly in" : i === stops.length - 1 ? "Fly out" : `Stop ${i + 1}`;
             return (
               <li key={s.id} className="flex flex-col">
                 <div className="group flex items-start gap-3 py-2">
@@ -81,14 +83,14 @@ export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, 
                     {i + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="eyebrow !text-[10px]">{role}{stops.length === 1 ? " · fly out" : ""}</div>
+                    <div className="eyebrow !text-[10px]">{role}{stops.length === 1 && !stay ? " · fly out" : ""}</div>
                     <div className="flex items-baseline gap-2">
                       <span className="display truncate text-[21px] leading-tight">{s.cityInfo.name}</span>
                       {s.stopover && <span className="chip chip-accent flex-none">Stopover</span>}
                       {s.cityInfo.localName && <span className="text-[13px] text-ink-3">{s.cityInfo.localName}</span>}
                     </div>
                     <div className="mt-0.5 text-[12.5px] text-ink-2">
-                      {fmtShort(s.arrive)} – {fmtShort(s.depart)} · {s.cityInfo.countryName}
+                      {fmtShort(s.arrive)} – {fmtShort(s.depart)} · {s.cityInfo.area && s.cityInfo.area !== s.cityInfo.name ? `${s.cityInfo.area}, ` : ""}{s.cityInfo.countryName}
                     </div>
                     <button type="button" onClick={() => onExplore(s.id)} className="mt-1 inline-flex items-center gap-1 text-[12.5px] font-medium text-accent hover:underline">
                       Stays, sights &amp; food <ArrowIcon size={12} />
@@ -122,11 +124,17 @@ export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, 
               <CityPicker
                 label="Add a city"
                 tripCities={trip.stops.map((s) => s.city)}
-                placeholder="Add a city: Tokyo, Guilin, Seoul…"
-                cities={DESTINATION_CITIES}
+                placeholder={stay ? "Add a place: a town, park or lake" : "Add a city: Tokyo, Guilin, Seoul…"}
+                cities={stay ? [...DESTINATION_CITIES, ...HOME_CITIES] : DESTINATION_CITIES}
+                anywhere={stay}
                 exclude={trip.stops.length ? [trip.stops[trip.stops.length - 1].city] : []}
                 autoFocus
-                onChange={(c) => { dispatch({ type: "addStop", city: c }); setAdding(false); }}
+                onChange={(c) => {
+                  const place = customPlaceOf(c);
+                  if (place) dispatch({ type: "addPlaces", places: [place] });
+                  dispatch({ type: "addStop", city: c });
+                  setAdding(false);
+                }}
                 onCancel={() => setAdding(false)}
               />
             ) : (
@@ -136,7 +144,7 @@ export function TripBuilder({ trip, dispatch, legs, selectedLegId, onSelectLeg, 
             )}
           </li>
 
-          {stops.length > 0 && (
+          {stops.length > 0 && !stay && (
             <li className="flex items-center justify-between gap-2 border-t border-line pt-3">
               <label htmlFor="return-home" className="flex cursor-pointer items-center gap-2 text-[13.5px]">
                 <input id="return-home" type="checkbox" className="accent-[var(--accent)]" checked={trip.returnHome} onChange={(e) => dispatch({ type: "returnHome", value: e.target.checked })} />
@@ -214,7 +222,7 @@ function GroundLegRow({ leg, selected, onSelect, onMode, pick, quote }: { leg: L
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex gap-0.5" role="radiogroup" aria-label={`How to get from ${leg.from.name} to ${leg.to.name}`}>
-            {MODES.map((m) => {
+            {MODES.filter((m) => m !== "flight" || (!leg.from.custom && !leg.to.custom)).map((m) => {
               const Icon = MODE_ICON[m];
               const on = leg.mode === m;
               return (

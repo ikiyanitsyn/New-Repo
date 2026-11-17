@@ -917,7 +917,8 @@ a.provider-credit { text-decoration: underline; text-underline-offset: 2px; }
 .brief.important { border-color: var(--accent); }
 
 @media (max-width: 860px) {
-  .concierge { position: fixed; inset: 0; z-index: 40; display: block; overflow-y: auto; padding-top: env(safe-area-inset-top, 0px); }
+  /* No fade on phones: a slow first frame can leave the page behind showing through. */
+  .concierge { position: fixed; inset: 0; z-index: 40; display: block; overflow-y: auto; padding-top: env(safe-area-inset-top, 0px); animation: none; }
   .concierge-ask { border-right: 0; border-bottom: 1px solid var(--line); padding-inline: 20px; overflow: visible; }
   .concierge-plan { padding: 28px 20px 48px; overflow: visible; }
   .day-card { flex-direction: column; gap: 8px; }

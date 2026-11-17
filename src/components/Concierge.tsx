@@ -2,10 +2,12 @@
 
 import { useMemo, useRef, useState } from "react";
 import { keepOwnItems } from "@/lib/planAdd";
-import { findCity } from "@/lib/cities";
+import { outdoorsy } from "@/lib/places/links";
+import { StayIdeaCard } from "./planner/StayPanel";
+import { findCity, placeLabel } from "@/lib/cities";
 import { fmtShort } from "@/lib/format";
 import type { PlanResponse, SavedPlan } from "@/lib/ai/schema";
-import { stopsWithDates, tripLegs, type Trip } from "@/lib/trip";
+import { isStayTrip, stopsWithDates, tripLegs, type Trip } from "@/lib/trip";
 import type { TripAction } from "@/lib/tripReducer";
 import { ArrowIcon, ExternalIcon, SparkIcon } from "./icons";
 import { PlaneLoader } from "./PlaneLoader";
@@ -95,7 +97,7 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: 
   const [elapsed, setElapsed] = useState(0);
   const [progress, setProgress] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const [view, setView] = useState<"days" | "before">("days");
+  const [view, setView] = useState<"days" | "stays" | "before">("days");
 
   const outdated = plan && plan.forStops !== stopSignature(trip);
   const legs = useMemo(() => tripLegs(trip), [trip]);
@@ -135,6 +137,7 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: 
         modes: legs.filter((l) => l.kind === "between").map((l) => l.mode),
         saved: Object.fromEntries(Object.entries(trip.saved ?? {}).map(([c, list]) => [c, list.map((p) => p.name)])),
         hotels: Object.fromEntries(Object.entries(trip.hotels ?? {}).map(([c, h]) => [c, h.name.slice(0, 160)])),
+        places: (trip.places ?? []).filter((p) => trip.stops.some((s) => s.city === p.code)),
       },
     };
     try {
@@ -265,8 +268,17 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: 
             <SparkIcon size={28} className="text-accent" />
             <h3 className="display text-[28px] leading-tight">Your day-by-day plan will appear here</h3>
             <p className="max-w-[46ch] text-[15px] leading-relaxed text-ink-2">
-              A full itinerary for {stops.length ? stops.map((s) => s.cityInfo.name).join(", ") : "your trip"}: sights grouped by neighbourhood,
-              meals worth planning around, easy arrival days, and a &ldquo;Before you go&rdquo; brief on visas, money, phones and etiquette.
+              {isStayTrip(trip) ? (
+                <>
+                  A plan for your stay at {stops.map((s) => s.cityInfo.name).join(" and ")}: where to base yourself and what kind of place to rent,
+                  what to do each day, and a &ldquo;Before you go&rdquo; brief on roads, permits, weather and safety.
+                </>
+              ) : (
+                <>
+                  A full itinerary for {stops.length ? stops.map((s) => s.cityInfo.name).join(", ") : "your trip"}: sights grouped by neighbourhood,
+                  meals worth planning around, easy arrival days, and a &ldquo;Before you go&rdquo; brief on visas, money, phones and etiquette.
+                </>
+              )}
             </p>
           </div>
         ) : (
@@ -307,10 +319,39 @@ export function Concierge({ trip, dispatch, onClose, onOpenCity, onOpenPlace }: 
 
             <div className="segmented self-start" role="tablist" aria-label="Plan sections">
               <button type="button" role="tab" aria-selected={view === "days"} onClick={() => setView("days")}>Day by day</button>
+              {(resp.stays?.length ?? 0) > 0 && <button type="button" role="tab" aria-selected={view === "stays"} onClick={() => setView("stays")}>Where to stay</button>}
               <button type="button" role="tab" aria-selected={view === "before"} onClick={() => setView("before")}>Before you go</button>
             </div>
 
-            {view === "days" ? (
+            {view === "stays" && resp.stays?.length ? (
+              <div className="flex flex-col gap-5">
+                <p className="max-w-[62ch] text-[14px] leading-relaxed text-ink-2">
+                  Places to base yourself, with searches for your dates on each site. Prices are rough guides; check the listing.
+                </p>
+                {stops.filter((st) => resp.stays!.some((x) => x.city === st.city)).map((st) => (
+                  <section key={st.id} className="flex flex-col gap-2">
+                    <h3 className="display text-[22px]">{st.cityInfo.name}</h3>
+                    <ul className="cascade grid gap-2 sm:grid-cols-2">
+                      {resp.stays!.filter((x) => x.city === st.city).map((x) => (
+                        <StayIdeaCard
+                          key={`${x.area}-${x.kind}`}
+                          idea={x}
+                          where={st.cityInfo.area ?? st.cityInfo.countryName}
+                          country={st.cityInfo.country}
+                          checkin={st.arrive}
+                          checkout={st.depart}
+                          adults={trip.adults}
+                          outdoors={outdoorsy(st.cityInfo)}
+                        />
+                      ))}
+                    </ul>
+                    <button type="button" className="self-start text-[13px] font-medium text-accent hover:underline" onClick={() => onOpenCity(st.city)}>
+                      Browse all places to stay in {st.cityInfo.name} →
+                    </button>
+                  </section>
+                ))}
+              </div>
+            ) : view === "days" ? (
               resp.days.length === 0 ? (
                 <p className="text-[15px] text-ink-2">Choose your cities (or use the suggested route), then update the plan to see each day.</p>
               ) : (
@@ -381,7 +422,7 @@ function ChipGroup({ label, options, selected, onToggle }: { label: string; opti
 }
 
 
-const TYPE_LABEL = { oneway: "One way", round: "Round trip", multi: "Multi-city", stopover: "With a stopover" } as const;
+const TYPE_LABEL = { oneway: "One way", round: "Round trip", multi: "Multi-city", stopover: "With a stopover", stay: "Stay, no flights" } as const;
 
 /** What the concierge will plan around: the cities, nights and dates from your search. */
 function TripContext({ trip }: { trip: Trip }) {
@@ -405,15 +446,15 @@ function TripContext({ trip }: { trip: Trip }) {
         <a href="#start" className="text-[12.5px] font-medium text-accent hover:underline">Change in search</a>
       </div>
       <div className="text-[14px] leading-relaxed">
-        <span className="text-ink-2">{home?.name} →</span>{" "}
+        {!isStayTrip(trip) && <><span className="text-ink-2">{home?.name} →</span>{" "}</>}
         {stops.map((st, i) => (
           <span key={st.id}>
-            <strong>{st.cityInfo.name}</strong> <span className="data text-[12px] text-ink-2">{st.nights}n</span>
+            <strong>{placeLabel(st.cityInfo)}</strong> <span className="data text-[12px] text-ink-2">{st.nights}n</span>
             {st.stopover && <span className="chip chip-accent ml-1 !h-5 !text-[10.5px]">Stopover</span>}
             {i < stops.length - 1 ? " → " : ""}
           </span>
         ))}
-        {trip.returnHome && <span className="text-ink-2"> → {home?.name}</span>}
+        {trip.returnHome && !isStayTrip(trip) && <span className="text-ink-2"> → {home?.name}</span>}
       </div>
       <div className="data text-[12.5px] text-ink-2">
         {fmtShort(trip.departDate)} – {fmtShort(end)} · {trip.adults} {trip.adults === 1 ? "traveller" : "travellers"} · {TYPE_LABEL[type]}

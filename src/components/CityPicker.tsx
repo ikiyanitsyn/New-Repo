@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { findCity, REGION_ORDER, type City } from "@/lib/cities";
+import { findCity, getCity, REGION_ORDER, registerPlaces, type City, type CustomPlace } from "@/lib/cities";
 import { distanceKm } from "@/lib/geo";
 
 interface Props {
@@ -19,6 +19,11 @@ interface Props {
    * to the last stop. Defaults to none.
    */
   tripCities?: string[];
+  /**
+   * Also find places that aren't in the city list (a national forest, a lake town…)
+   * through OpenStreetMap, when the traveller presses Enter or "Search everywhere".
+   */
+  anywhere?: boolean;
 }
 
 export interface PickerGroup {
@@ -106,20 +111,42 @@ export function pickerGroups(cities: City[], query: string, exclude: string[], t
  * Accessible combobox: type to filter (city, country, local name or airport
  * code), arrows or Page Up/Down to move, Enter to choose, Esc to cancel.
  */
-export function CityPicker({ cities, value, onChange, placeholder, label, exclude = NONE, autoFocus, onCancel, tripCities = NONE }: Props) {
+export function CityPicker({ cities, value, onChange, placeholder, label, exclude = NONE, autoFocus, onCancel, tripCities = NONE, anywhere = false }: Props) {
   const id = useId();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(Boolean(autoFocus));
   // -1 means "the best match for the query", so typing highlights the likeliest city.
   const [active, setActive] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
-  const current = cities.find((c) => c.code === value);
+  const current = cities.find((c) => c.code === value) ?? (anywhere && value ? findCity(value) : undefined);
+  // Places found by "Search everywhere", for the query they answer.
+  const [found, setFound] = useState<{ q: string; status: "loading" | "done" | "error"; places: City[] } | null>(null);
+  const q = query.trim();
+  const canSearch = anywhere && q.length >= 2;
+  const foundHere = found && found.q === q ? found : null;
+  const searchEverywhere = () => {
+    if (!canSearch || foundHere?.status === "loading") return;
+    setFound({ q, status: "loading", places: [] });
+    setOpen(true);
+    fetch(`/api/geocode?${new URLSearchParams({ q })}`)
+      .then((r) => r.json() as Promise<{ places?: CustomPlace[]; error?: string }>)
+      .then((j) => {
+        registerPlaces(j.places);
+        setFound({ q, status: j.error && !j.places?.length ? "error" : "done", places: (j.places ?? []).map((p) => getCity(p.code)) });
+        setActive(0);
+      })
+      .catch(() => setFound({ q, status: "error", places: [] }));
+  };
 
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus();
   }, [autoFocus]);
 
-  const groups = useMemo(() => pickerGroups(cities, query, exclude, tripCities), [cities, query, exclude, tripCities]);
+  const groups = useMemo(() => {
+    const list = pickerGroups(cities, query, exclude, tripCities);
+    const places = foundHere?.places.filter((c) => !exclude.includes(c.code)) ?? [];
+    return places.length ? [{ key: "found", section: "Places", showCountry: true, cities: places } as PickerGroup, ...list] : list;
+  }, [cities, query, exclude, tripCities, foundHere]);
 
   const options = useMemo(
     () => groups.flatMap((g) => g.cities.map((city) => ({ city, optionId: `${id}-${g.key === "popular" ? "pop" : "all"}-${city.code}` }))),
@@ -171,7 +198,7 @@ export function CityPicker({ cities, value, onChange, placeholder, label, exclud
         aria-autocomplete="list"
         aria-activedescendant={open && activeOption ? activeOption.optionId : undefined}
         autoComplete="off"
-        placeholder={current ? `${current.name}, ${current.countryName}` : placeholder}
+        placeholder={current ? `${current.name}, ${current.custom ? current.area ?? current.countryName : current.countryName}` : placeholder}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -185,11 +212,12 @@ export function CityPicker({ cities, value, onChange, placeholder, label, exclud
           else if (e.key === "ArrowUp") { e.preventDefault(); move(-1); }
           else if (e.key === "PageDown") { e.preventDefault(); move(8); }
           else if (e.key === "PageUp") { e.preventDefault(); move(-8); }
+          else if (e.key === "Enter" && canSearch && !foundHere && !(activeOption && matchScore(activeOption.city, query) <= 1)) { e.preventDefault(); searchEverywhere(); }
           else if (e.key === "Enter" && open && activeOption) { e.preventDefault(); choose(activeOption.city); }
           else if (e.key === "Escape") { setOpen(false); onCancel?.(); }
         }}
       />
-      {open && options.length > 0 && (
+      {open && (options.length > 0 || canSearch) && (
         <div
           id={`${id}-list`}
           role="listbox"
@@ -227,21 +255,55 @@ export function CityPicker({ cities, value, onChange, placeholder, label, exclud
                     <span className="min-w-0 truncate">
                       <span className="display text-[15px]">{c.name}</span>
                       {c.localName && <span className="ml-1.5 text-[13px] text-ink-3">{c.localName}</span>}
-                      {g.showCountry && <span className="ml-2 text-[12.5px] text-ink-3">{c.countryName}</span>}
+                      {g.showCountry && <span className="ml-2 text-[12.5px] text-ink-3">{c.custom ? [c.area, c.countryName].filter(Boolean).join(", ") : c.countryName}</span>}
                     </span>
-                    <span
-                      className="data shrink-0 text-[11.5px] text-ink-3"
-                      title={c.flightCode ? `No airport of its own; flights use ${c.flightCode}` : undefined}
-                    >
-                      {c.flightCode ? `via ${c.flightCode}` : c.code}
-                    </span>
+                    {c.custom ? (
+                      <span className="shrink-0 text-[11.5px] text-ink-3">{c.kind ?? ""}</span>
+                    ) : (
+                      <span
+                        className="data shrink-0 text-[11.5px] text-ink-3"
+                        title={c.flightCode ? `No airport of its own; flights use ${c.flightCode}` : undefined}
+                      >
+                        {c.flightCode ? `via ${c.flightCode}` : c.code}
+                      </span>
+                    )}
                   </div>
                 );
               })}
             </div>
           ))}
+          {canSearch && (
+            <div role="presentation" className="border-t border-line px-1 pt-1 first:border-t-0">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[13.5px] hover:bg-[var(--surface-sunk)]"
+                onMouseDown={(e) => { e.preventDefault(); searchEverywhere(); }}
+                disabled={foundHere?.status === "loading"}
+              >
+                <SearchGlyph />
+                {foundHere?.status === "loading"
+                  ? <span className="text-ink-2">Searching everywhere…</span>
+                  : foundHere?.status === "done" && !foundHere.places.length
+                    ? <span className="text-ink-2">No places called &ldquo;{q}&rdquo;. Try adding a state or country.</span>
+                    : foundHere?.status === "error"
+                      ? <span className="text-ink-2">Place search is busy. Tap to try again.</span>
+                      : foundHere
+                        ? <span className="text-ink-2">Not it? Search again for &ldquo;{q}&rdquo;</span>
+                        : <span>Search everywhere for <strong>&ldquo;{q}&rdquo;</strong>: parks, lakes, towns, anywhere</span>}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function SearchGlyph() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden className="flex-none text-ink-3">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
   );
 }

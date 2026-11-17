@@ -1,3 +1,4 @@
+import { registerFromParams } from "@/lib/places/customParam";
 import type { NextRequest } from "next/server";
 import { HotelsError, hotelsStatus, liveHotels, parseHotelsQuery } from "@/lib/hotels/live";
 import { refreshSerpapiUsage } from "@/lib/serpapiQuota";
@@ -10,6 +11,7 @@ import { refreshSerpapiUsage } from "@/lib/serpapiQuota";
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
+  registerFromParams(params);
   await refreshSerpapiUsage();
   if (params.get("status")) return Response.json(hotelsStatus(), { headers: { "Cache-Control": "no-store" } });
   try {

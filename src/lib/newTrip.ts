@@ -1,5 +1,5 @@
 import { addDays, tripEndDate, type Trip, type TripType } from "./trip";
-import { findCity, getCity, type City } from "./cities";
+import { customPlaceOf, findCity, getCity, isCustomCode, type City } from "./cities";
 import { fmtShort } from "./format";
 import type { Cabin } from "./flights/types";
 import type { TripAction } from "./tripReducer";
@@ -90,10 +90,11 @@ export function arrivalOffset(home: City, first: City): number {
 }
 
 /** Which date the calendar asks for: a range (depart → return) or a single departure date. */
-export const calendarMode = (t: TripType): "range" | "single" => (t === "round" || t === "stopover" ? "range" : "single");
+export const calendarMode = (t: TripType): "range" | "single" => (t === "round" || t === "stopover" || t === "stay" ? "range" : "single");
 
 /** The first city you fly into, for the arrival-day offset. */
 function firstCity(s: TripSearch): string | undefined {
+  if (s.tripType === "stay") return undefined;
   if (s.tripType === "multi") return s.cities[0]?.city;
   if (s.tripType === "stopover") return s.stopover?.city ?? s.to;
   return s.to;
@@ -102,6 +103,7 @@ function firstCity(s: TripSearch): string | undefined {
 /** Nights on the ground for a depart → return range (after the overnight flight out). */
 export function groundNights(s: TripSearch): number {
   if (!s.returnDate) return 0;
+  if (s.tripType === "stay") return nightsBetween(s.departDate, s.returnDate); // check-in to check-out
   const first = firstCity(s);
   const offset = first && findCity(s.home) && findCity(first) ? arrivalOffset(getCity(s.home), getCity(first)) : 0;
   return nightsBetween(s.departDate, s.returnDate) - offset;
@@ -111,6 +113,13 @@ export type SearchProblem = { field: "to" | "dates" | "cities" | "stopover" | "h
 
 /** Everything the search needs before it can build a trip, in the order a person would fix it. */
 export function searchProblem(s: TripSearch): SearchProblem | null {
+  if (s.tripType === "stay") {
+    if (!s.to || !findCity(s.to)) return { field: "to", message: "Choose where you want to stay: a town, a park, a lake, anywhere." };
+    if (!s.returnDate) return { field: "dates", message: "Choose a check-out date." };
+    if (nightsBetween(s.departDate, s.returnDate) < 1) return { field: "dates", message: "Check-out must be at least a night after check-in." };
+    if (nightsBetween(s.departDate, s.returnDate) > 30) return { field: "dates", message: "Stays can be up to 30 nights." };
+    return null;
+  }
   if (!findCity(s.home)) return { field: "home", message: "Choose where you are flying from." };
   if (s.tripType === "multi") {
     if (s.cities.length === 0) return { field: "cities", message: "Add at least one city." };
@@ -147,6 +156,7 @@ export function searchStops(s: TripSearch): { city: string; nights: number; stop
     case "oneway":
       return s.to ? [{ city: s.to, nights: clampNights(s.nights) }] : [];
     case "round":
+    case "stay":
       return s.to ? [{ city: s.to, nights: clampNights(s.returnDate ? groundNights(s) : s.nights) }] : [];
     case "stopover": {
       const hubNights = clampNights(s.stopover?.nights ?? DEFAULT_STOPOVER_NIGHTS);
@@ -162,6 +172,7 @@ function searchTitle(s: TripSearch): string {
   const stops = searchStops(s).filter((x) => !x.stopover);
   const names = stops.map((x) => findCity(x.city)?.name).filter(Boolean) as string[];
   if (names.length === 0) return "My trip";
+  if (s.tripType === "stay") return `${names[0]} stay`;
   if (names.length === 1) return `${names[0]} trip`;
   const countries = new Set(stops.map((x) => findCity(x.city)?.countryName));
   if (countries.size === 1) return `${[...countries][0]} trip`;
@@ -174,8 +185,10 @@ function searchTitle(s: TripSearch): string {
  * the arrival city; multi-city and stopover fly home from the last city.
  */
 export function searchTripActions(s: TripSearch): TripAction[] {
+  const place = s.to ? customPlaceOf(s.to) : undefined;
   return [
     { type: "reset" },
+    ...(place ? [{ type: "addPlaces", places: [place] } as TripAction] : []),
     { type: "home", city: s.home },
     { type: "date", date: s.departDate },
     { type: "adults", value: s.adults },
@@ -210,6 +223,8 @@ export function initialSearch(trip: Trip, today: Date = new Date()): TripSearch 
 export function switchTripType(s: TripSearch, t: TripType): TripSearch {
   if (t === s.tripType) return s;
   const next: TripSearch = { ...s, tripType: t };
+  // Places found by search have no airport, so they can't be a flight destination.
+  if (t !== "stay" && s.to && isCustomCode(s.to)) next.to = undefined;
   if (t === "multi" && s.cities.length === 0) {
     // Carry the route over: a stopover trip becomes hub + destination; anything else becomes its destination.
     next.cities = searchStops(s).map((x) => ({ key: searchKey(), city: x.city, nights: x.nights }));

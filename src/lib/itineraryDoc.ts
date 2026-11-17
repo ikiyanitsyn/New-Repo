@@ -1,4 +1,4 @@
-import { findCity, getCity } from "./cities";
+import { findCity, getCity, isCustomCode } from "./cities";
 import { airlineName } from "./flights/airlines";
 import { fmtTime } from "./format";
 import { formatDuration, formatUsd } from "./geo";
@@ -122,6 +122,8 @@ export interface ItineraryDoc {
   travellerNames: string[];
   cabin: string;
   homeName: string;
+  /** A stay with no flights: no home city, cabin or flight costs on the cover. */
+  stay: boolean;
   /** City codes in travel order, starting (and, for a round trip, ending) at home. */
   route: string[];
   routeLine: string;
@@ -315,7 +317,8 @@ export function buildItinerary(trip: Trip): ItineraryDoc | null {
     } else ground += t.costUsd ?? 0;
   }
 
-  const route = [trip.home, ...stops.map((s) => s.city), ...(trip.returnHome ? [trip.home] : [])];
+  const stay = trip.tripType === "stay";
+  const route = stay ? stops.map((s) => s.city) : [trip.home, ...stops.map((s) => s.city), ...(trip.returnHome ? [trip.home] : [])];
   const official = plan?.official?.length ? plan.official : officialLinks(stops.map((s) => s.city));
 
   return {
@@ -328,8 +331,10 @@ export function buildItinerary(trip: Trip): ItineraryDoc | null {
     travellerNames: (trip.travellers ?? []).map((n) => n.trim()).filter(Boolean),
     cabin: CABIN_LABEL[trip.cabin] ?? trip.cabin,
     homeName: home.name,
+    stay,
     route,
-    routeLine: route.join(" → "),
+    // Searched places have internal codes ("0PGVXW"): show their names instead.
+    routeLine: route.map((c) => (isCustomCode(c) ? getCity(c).name : c)).join(" → "),
     cityNames: stops.map((s) => s.cityInfo.name).filter((c, i, a) => a.indexOf(c) === i),
     days,
     cities,

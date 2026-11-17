@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState, useSyncExternalStore, type Dispatch } from "react";
-import { DESTINATION_CITIES, findCity, getCity, HOME_CITIES } from "@/lib/cities";
+import { DESTINATION_CITIES, findCity, getCity, HOME_CITIES, isCustomCode } from "@/lib/cities";
 import type { TripSummary } from "@/lib/cloud/trips";
 import { fmtShort } from "@/lib/format";
 import {
@@ -85,7 +85,11 @@ const TRIP_TYPES: { value: TripType; label: string }[] = [
   { value: "round", label: "Round trip" },
   { value: "multi", label: "Multi-city" },
   { value: "stopover", label: "Stopover" },
+  { value: "stay", label: "Stay only" },
 ];
+
+/** Anywhere you might stay: every catalog city (US ones too), plus places found by search. */
+const STAY_CITIES = [...DESTINATION_CITIES, ...HOME_CITIES];
 
 interface Props {
   trip: Trip;
@@ -135,6 +139,7 @@ export function Landing({ trip, dispatch, hasSavedTrip, onPlan, onConcierge, onC
   const flapName = (heroPhoto?.name ?? (chosenCity ? findCity(chosenCity)?.name : "") ?? "").toUpperCase().slice(0, 12);
 
   const mode = calendarMode(search.tripType);
+  const stay = search.tripType === "stay";
   const problem = searchProblem(search);
   const shownProblem = tried ? problem : null;
   const update = (patch: Partial<TripSearch>) => setSearch((x) => ({ ...x, ...patch }));
@@ -173,7 +178,7 @@ export function Landing({ trip, dispatch, hasSavedTrip, onPlan, onConcierge, onC
   const stops = searchStops(search);
   const totalNights = stops.reduce((n, x) => n + x.nights, 0);
   const firstStop = stops[0]?.city;
-  const offset = firstStop ? arrivalOffset(getCity(search.home), getCity(firstStop)) : 0;
+  const offset = firstStop && !stay ? arrivalOffset(getCity(search.home), getCity(firstStop)) : 0;
   const multiEnd = addDaysIso(search.departDate, totalNights + offset);
   const dateValue = mode === "range" && search.returnDate
     ? `${fmtShort(search.departDate)} → ${fmtShort(search.returnDate)}`
@@ -189,7 +194,7 @@ export function Landing({ trip, dispatch, hasSavedTrip, onPlan, onConcierge, onC
   })();
   const calendarNote = search.tripType === "stopover" && search.stopover?.city
     ? `Includes ${search.stopover.nights} nights in ${getCity(search.stopover.city).name}${offset ? "; you land the day after you leave" : ""}.`
-    : offset && mode === "range" ? "Flights to Asia and Europe land the next day, so the first night is in the air." : undefined;
+    : offset && mode === "range" ? "Flights to Asia and Europe land the next day, so the first night is in the air." : stay ? "Choose your check-in day, then your check-out day." : undefined;
 
   /* ---- Ideas, deals, stopovers, suggestions fill the search ---- */
   const scrollToSearch = () => document.getElementById(`${ids}-composer`)?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -317,10 +322,12 @@ export function Landing({ trip, dispatch, hasSavedTrip, onPlan, onConcierge, onC
             </div>
 
             <div className={s.fields}>
-              <div className={`${s.part} ${s.city}`} id={`${ids}-home`} data-missing={missing("home")} data-filled>
-                <span className={s.label} aria-hidden>From</span>
-                <CityPicker cities={HOME_CITIES} value={search.home} onChange={(code) => update({ home: code })} placeholder="Your city" label="From: departure city" />
-              </div>
+              {!stay && (
+                <div className={`${s.part} ${s.city}`} id={`${ids}-home`} data-missing={missing("home")} data-filled>
+                  <span className={s.label} aria-hidden>From</span>
+                  <CityPicker cities={HOME_CITIES} value={search.home} onChange={(code) => update({ home: code })} placeholder="Your city" label="From: departure city" />
+                </div>
+              )}
 
               {search.tripType === "stopover" && (
                 <div className={`${s.part} ${s.city}`} id={`${ids}-stopover`} data-missing={missing("stopover")} data-filled={search.stopover?.city ? true : undefined}>
@@ -339,20 +346,21 @@ export function Landing({ trip, dispatch, hasSavedTrip, onPlan, onConcierge, onC
 
               {search.tripType !== "multi" && (
                 <div className={`${s.part} ${s.city}`} id={`${ids}-to`} data-missing={missing("to")} data-filled={search.to ? true : undefined}>
-                  <span className={s.label} aria-hidden>To</span>
+                  <span className={s.label} aria-hidden>{stay ? "Where" : "To"}</span>
                   <CityPicker
-                    cities={DESTINATION_CITIES}
+                    cities={stay ? STAY_CITIES : DESTINATION_CITIES}
+                    anywhere={stay}
                     value={search.to}
                     onChange={(code) => update({ to: code })}
-                    placeholder="Search a city, e.g. Beijing"
-                    label={search.tripType === "stopover" ? "To: destination" : "To: city"}
+                    placeholder={stay ? "A town, park or lake, e.g. Sierra National Forest" : "Search a city, e.g. Beijing"}
+                    label={stay ? "Where: any town, park or lake" : search.tripType === "stopover" ? "To: destination" : "To: city"}
                     exclude={search.stopover?.city && search.tripType === "stopover" ? [search.stopover.city] : undefined}
                   />
                 </div>
               )}
 
               <div className={`${s.part} ${s.dates}`} id={`${ids}-dates`} data-missing={missing("dates")}>
-                <span className={s.label} id={`${ids}-dates-label`}>{mode === "range" ? "Depart → Return" : "Depart"}</span>
+                <span className={s.label} id={`${ids}-dates-label`}>{stay ? "Check-in → Check-out" : mode === "range" ? "Depart → Return" : "Depart"}</span>
                 <button
                   id={`${ids}-dates-btn`}
                   type="button"
@@ -372,7 +380,7 @@ export function Landing({ trip, dispatch, hasSavedTrip, onPlan, onConcierge, onC
               </div>
 
               <div className={`${s.part} ${s.travellers}`}>
-                <TravellersPicker adults={search.adults} cabin={search.cabin} labelClass={s.label} onChange={(adults, cabin) => update({ adults, cabin })} />
+                <TravellersPicker adults={search.adults} cabin={search.cabin} labelClass={s.label} noCabin={stay} onChange={(adults, cabin) => update({ adults, cabin })} />
               </div>
 
               <button type="submit" className={`btn btn-primary ${s.go}`}>
@@ -395,7 +403,7 @@ export function Landing({ trip, dispatch, hasSavedTrip, onPlan, onConcierge, onC
                 onChange={setDraft}
                 onClose={closeCalendar}
                 note={calendarNote}
-                label={search.to || search.cities.length ? `Return from ${getCity(stops[stops.length - 1]?.city ?? search.to!).name}` : undefined}
+                label={stay ? "Check-out" : search.to || search.cities.length ? `Return from ${getCity(stops[stops.length - 1]?.city ?? search.to!).name}` : undefined}
               />
             )}
           </form>
@@ -421,7 +429,7 @@ export function Landing({ trip, dispatch, hasSavedTrip, onPlan, onConcierge, onC
         <div className="reveal"><IdeasSection months={chosenMonths} onPick={pickIdea} /></div>
         <div className="reveal"><DealsSection
           from={search.home}
-          to={dealTo && findCity(dealTo) ? dealTo : undefined}
+          to={dealTo && findCity(dealTo) && !isCustomCode(dealTo) ? dealTo : undefined}
           month={search.departDate.slice(0, 7)}
           nights={Math.max(1, mode === "range" && search.returnDate ? nightsOf(search.departDate, search.returnDate) : totalNights || search.nights)}
           adults={search.adults}

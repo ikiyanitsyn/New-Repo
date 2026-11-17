@@ -39,12 +39,12 @@ export function parseHotelsQuery(p: URLSearchParams, now: Date = new Date()): Ho
   if (checkout <= checkin) throw bad("Check-out must be after check-in");
   if (checkout < now.toISOString().slice(0, 10)) throw bad("Those dates are in the past");
   if (!Number.isFinite(adults) || adults < 1 || adults > 10) throw bad("Guests must be 1 to 10");
-  return { city, checkin, checkout, adults };
+  return { city, checkin, checkout, adults, ...(p.get("rentals") === "1" ? { rentals: true } : {}) };
 }
 
 export async function liveHotels(q: HotelsQuery, opts: { fetchImpl?: typeof fetch; now?: () => number } = {}): Promise<HotelsResult> {
   const now = opts.now ?? Date.now;
-  const k = [q.city, q.checkin, q.checkout, q.adults].join("|");
+  const k = [q.city, q.checkin, q.checkout, q.adults, q.rentals ? "rentals" : "hotels"].join("|");
   const hit = cache.get(k);
   if (hit && now() - hit.at < HOTELS_CACHE_MS) return { ...hit.value, quota: serpapiQuota() };
 

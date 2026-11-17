@@ -14,6 +14,7 @@ export function requestFromTrip(trip: Trip) {
       stops: trip.stops.map((s) => ({ city: s.city, nights: s.nights, ...(s.stopover ? { stopover: true } : {}) })),
       modes: tripLegs(trip).filter((l) => l.kind === "between").map((l) => l.mode),
       tripType: trip.tripType,
+      places: (trip.places ?? []).filter((p) => trip.stops.some((s) => s.city === p.code)),
     },
   });
 }

@@ -195,6 +195,8 @@ function ModeCompare({ leg, adults, onMode, compact }: { leg: Leg; adults: numbe
         <tbody>
           {rows
             .filter((r) => !compact || r.mode !== "flight")
+            // Searched places have no airport of their own.
+            .filter((r) => r.mode !== "flight" || (!leg.from.custom && !leg.to.custom))
             .filter((r) => !(r.mode === "ferry" && leg.from.country === leg.to.country && r.distanceKm > 300))
             .map((r) => {
               const Icon = MODE_ICON[r.mode];

@@ -1,8 +1,10 @@
 import type { NextRequest } from "next/server";
 import { findCity } from "@/lib/cities";
+import { registerFromParams } from "@/lib/places/customParam";
 import { cityPlaces } from "@/lib/places/wikivoyage";
 
 export async function GET(request: NextRequest) {
+  registerFromParams(request.nextUrl.searchParams);
   const code = request.nextUrl.searchParams.get("city") ?? "";
   if (!findCity(code)) return Response.json({ error: "Unknown city" }, { status: 400 });
 

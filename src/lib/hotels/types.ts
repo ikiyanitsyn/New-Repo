@@ -29,6 +29,8 @@ export interface HotelsQuery {
   checkin: string; // YYYY-MM-DD
   checkout: string; // YYYY-MM-DD
   adults: number;
+  /** Vacation rentals (cabins, houses, apartments) instead of hotels. */
+  rentals?: boolean;
 }
 
 export interface HotelsResult {

@@ -1,4 +1,4 @@
-import { findCity } from "@/lib/cities";
+import { findCity, registerPlaces } from "@/lib/cities";
 import { AiError, getProvider } from "@/lib/ai/provider";
 import { SwapRequest } from "@/lib/ai/schema";
 import { swapItem } from "@/lib/ai/swap";
@@ -12,6 +12,7 @@ export const maxDuration = 60;
  */
 export async function POST(request: Request) {
   const parsed = SwapRequest.safeParse(await request.json().catch(() => null));
+  if (parsed.success && parsed.data.place) registerPlaces([parsed.data.place]);
   if (!parsed.success || !findCity(parsed.data.city)) {
     return Response.json({ error: "That item couldn't be read. Reload the page and try again." }, { status: 400 });
   }

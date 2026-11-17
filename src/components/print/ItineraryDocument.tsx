@@ -208,8 +208,14 @@ function Cover({ doc, edit }: { doc: ItineraryDoc; edit?: EditApi }) {
 
       <dl className={styles.coverFacts}>
         <div><dt>Length</dt><dd><span className={styles.num}>{plural(doc.nights, "night")}</span> · <span className={styles.num}>{plural(doc.dayCount, "day")}</span></dd></div>
-        <div><dt>Party</dt><dd>{plural(doc.travellers, "traveller")} · {doc.cabin}</dd></div>
-        <div><dt>From</dt><dd>{doc.homeName}</dd></div>
+        {doc.stay ? (
+          <div><dt>Party</dt><dd>{plural(doc.travellers, "guest")} · no flights</dd></div>
+        ) : (
+          <>
+            <div><dt>Party</dt><dd>{plural(doc.travellers, "traveller")} · {doc.cabin}</dd></div>
+            <div><dt>From</dt><dd>{doc.homeName}</dd></div>
+          </>
+        )}
       </dl>
 
       <table className={styles.stopsTable}>

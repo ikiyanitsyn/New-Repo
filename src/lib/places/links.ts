@@ -44,14 +44,38 @@ export function tripComHotelsUrl(city: City, checkin: string, checkout: string, 
  * mainland China, Hong Kong and Macau; Google Hotels stays as a comparison.
  */
 export function staySearchLinks(city: City, checkin: string, checkout: string, adults: number): OutLink[] {
+  const where = `${city.name}, ${city.area ?? city.countryName}`;
   const links: OutLink[] = [
     {
       label: "Booking.com",
-      url: `https://www.booking.com/searchresults.html?ss=${q(`${city.name}, ${city.countryName}`)}&checkin=${checkin}&checkout=${checkout}&group_adults=${adults}&no_rooms=1`,
+      url: `https://www.booking.com/searchresults.html?ss=${q(where)}&checkin=${checkin}&checkout=${checkout}&group_adults=${adults}&no_rooms=1`,
     },
   ];
   if (TRIP_COM_COUNTRIES.has(city.country)) links.push({ label: "Trip.com", url: tripComHotelsUrl(city, checkin, checkout, adults) });
-  links.push({ label: "Google Hotels", url: `https://www.google.com/travel/search?q=${q(`hotels in ${city.name}`)}&dates=${checkin},${checkout}` });
+  links.push(...rentalSearchLinks(where, city.country, checkin, checkout, adults, outdoorsy(city)));
+  links.push({ label: "Google Hotels", url: `https://www.google.com/travel/search?q=${q(`${city.custom ? "places to stay near" : "hotels in"} ${where}`)}&dates=${checkin},${checkout}` });
+  return links;
+}
+
+/** A park, forest, lake or mountain area, where cabins and campgrounds matter more than hotels. */
+export function outdoorsy(city: City): boolean {
+  return Boolean(city.custom && /forest|park|wilderness|lake|mountain|monument|reserve|valley|beach|island|ski|protected/i.test(`${city.kind ?? ""} ${city.name}`));
+}
+
+/**
+ * Vacation-rental and outdoor-stay searches for a place and dates: Airbnb and Vrbo everywhere,
+ * plus Hipcamp and Recreation.gov (cabins, lookouts and campgrounds on US public land) for
+ * outdoor places in the US. These open the provider's own search with the details filled in.
+ */
+export function rentalSearchLinks(where: string, country: string, checkin: string, checkout: string, adults: number, outdoors = false): OutLink[] {
+  const links: OutLink[] = [
+    { label: "Airbnb", url: `https://www.airbnb.com/s/${q(where)}/homes?checkin=${checkin}&checkout=${checkout}&adults=${adults}` },
+    { label: "Vrbo", url: `https://www.vrbo.com/search?destination=${q(where)}&startDate=${checkin}&endDate=${checkout}&adults=${adults}` },
+  ];
+  if (outdoors && (country === "US" || country === "CA")) {
+    links.push({ label: "Hipcamp", url: `https://www.hipcamp.com/en-US/search?q=${q(where)}&arrive=${checkin}&depart=${checkout}&adults=${adults}` });
+  }
+  if (outdoors && country === "US") links.push({ label: "Recreation.gov", url: `https://www.recreation.gov/search?q=${q(where.split(",")[0])}` });
   return links;
 }
 

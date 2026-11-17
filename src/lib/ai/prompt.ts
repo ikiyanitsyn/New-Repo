@@ -32,8 +32,21 @@ export function requestTrip(r: PlanRequest): Trip {
     cabin: "economy",
     stops: r.trip.stops.map((s, i) => ({ id: `s${i}`, city: s.city, nights: s.nights, ...(s.stopover ? { stopover: true } : {}) })),
     legModes: {},
+    tripType: r.trip.tripType,
+    places: r.trip.places,
   };
 }
+
+/** A stay: no flights, the traveller makes their own way there (usually by car). */
+const isStay = (r: PlanRequest) => r.trip.tripType === "stay";
+/** Every stop is in the US, so entry rules don't apply. */
+const domestic = (r: PlanRequest) => r.trip.stops.length > 0 && r.trip.stops.every((s) => getCity(s.city).country === "US");
+/** "Sierra National Forest (national forest, California)" for a searched place; the city name otherwise. */
+const describe = (code: string) => {
+  const c = getCity(code);
+  const bits = [c.kind, c.area ?? (c.custom ? c.countryName : undefined)].filter(Boolean);
+  return bits.length ? `${c.name} (${bits.join(", ")})` : c.name;
+};
 
 /** One slot per calendar day, from arrival in the first city to the final departure. */
 export function daySlots(r: PlanRequest): DaySlot[] {
@@ -43,12 +56,16 @@ export function daySlots(r: PlanRequest): DaySlot[] {
     for (let d = 0; d < s.nights; d++) {
       const date = addDays(s.arrive, d);
       let note = "";
-      if (d === 0) note = i === 0 ? `arrive from ${getCity(r.trip.home).name} (long-haul flight; keep it light)` : `travel from ${stops[i - 1].cityInfo.name} by ${r.trip.modes[i - 1] ?? "train"}, then explore`;
+      if (d === 0) {
+        note = i > 0
+          ? `travel from ${stops[i - 1].cityInfo.name} by ${r.trip.modes[i - 1] ?? (isStay(r) ? "car" : "train")}, then explore`
+          : isStay(r) ? "arrive (they make their own way there, usually by car) and check in; keep it light" : `arrive from ${getCity(r.trip.home).name} (long-haul flight; keep it light)`;
+      }
       out.push({ date, city: s.city, note });
     }
   });
   const last = stops[stops.length - 1];
-  if (last) out.push({ date: last.depart, city: last.city, note: r.trip.returnHome ? `fly home to ${getCity(r.trip.home).name}` : "departure day" });
+  if (last) out.push({ date: last.depart, city: last.city, note: isStay(r) ? "check out and head home; a short morning only" : r.trip.returnHome ? `fly home to ${getCity(r.trip.home).name}` : "departure day" });
   return out;
 }
 
@@ -142,6 +159,7 @@ const OVERVIEW_SCHEMA = `{
   "summary": string (2-3 sentences describing the shape of the trip),
   "questions": [ { "id": string, "question": string (max 15 words), "options": string[2-6 short choices], "multi": boolean } ] (0-4 items),
   "routeSuggestion": null | { "reason": string, "stops": [ { "city": CITY_CODE, "nights": integer } ] },
+  "stays": [ { "city": CITY_CODE, "area": string (the town, lake, valley or neighbourhood to base yourself in, max 6 words), "kind": string (e.g. "cabin rental", "lakeside lodge", "campground", "boutique hotel", max 4 words), "why": string (1-2 sentences: who it suits and what is close by), "price": string (typical nightly range in USD, e.g. "$180–300 a night") } ],
   "beforeYouGo": [ { "topic": string (max 4 words), "summary": string (1-2 sentences), "details": string[] (0-4 short points), "important": boolean } ]
 }`;
 
@@ -158,7 +176,9 @@ function travellerBlock(r: PlanRequest): string {
   return `Traveller request: ${r.request.trim() || "(none given: suggest a well-balanced trip)"}
 Preferences: ${r.preferences.join(", ") || "(none chosen)"}
 Answers to earlier questions: ${answers || "(none)"}
-Travellers: ${r.trip.adults} adult${r.trip.adults > 1 ? "s" : ""} from ${getCity(r.trip.home).name}, US passports. Leaving ${r.trip.departDate}.
+${isStay(r)
+    ? `Travellers: ${r.trip.adults} adult${r.trip.adults > 1 ? "s" : ""}, US based. A stay with no flights: they make their own way there (usually by car). Check-in ${r.trip.departDate}.`
+    : `Travellers: ${r.trip.adults} adult${r.trip.adults > 1 ? "s" : ""} from ${getCity(r.trip.home).name}, US passports. Leaving ${r.trip.departDate}.`}
 Trip type: ${TRIP_TYPE_TEXT[r.trip.tripType ?? (r.trip.returnHome ? (r.trip.stops.length > 1 ? "multi" : "round") : "oneway")]}.${stopoverBlock(r)}
 ${hotelBlock(r)}`;
 }
@@ -177,6 +197,7 @@ const TRIP_TYPE_TEXT = {
   round: "round trip",
   multi: "multi-city, flying home from the last city",
   stopover: "a planned stopover on the way, then the destination",
+  stay: "a stay only, with no flights to plan: help them choose where to base themselves and what to rent, then plan the days",
 } as const;
 
 /**
@@ -196,7 +217,7 @@ export function stopoverBlock(r: PlanRequest): string {
 }
 
 const routeLine = (r: PlanRequest) =>
-  r.trip.stops.map((s) => `${getCity(s.city).name} (${s.city}) ${s.nights}n${s.stopover ? " [stopover]" : ""}`).join(" → ") || "(no stops chosen yet)";
+  r.trip.stops.map((s) => `${describe(s.city)} (${s.city}) ${s.nights}n${s.stopover ? " [stopover]" : ""}`).join(" → ") || "(no stops chosen yet)";
 
 /** The overview call: title, summary, questions, route suggestion and the "Before you go" brief. */
 export function buildOverviewPrompt(r: PlanRequest): { system: string; user: string } {
@@ -211,7 +232,12 @@ Rules:
 - The day-by-day plan is written separately. Do not include days.
 - ${noStops ? `There are no stops yet: fill "routeSuggestion" with a sensible route and nights for the dates. CITY_CODE must be one of: ${allowed}.` : `The route is chosen: set "routeSuggestion" to null.`}
 - Match detail to the request: if it is vague, ask 3-4 questions with short option chips to narrow it (interests, pace, budget, must-dos). If it is detailed, ask 0-2 questions.
-- "beforeYouGo" covers, for US passport holders and these exact countries and dates: Visa & entry (important=true; describe the options clearly, say rules change, and tell them to confirm with official sources), Money & payments, Phone & internet, Getting around, Health & safety, Etiquette, Weather & packing. Be specific to the destinations (e.g. in mainland China many Western apps are blocked and mobile payments dominate). Do not state fees or durations you are unsure of. Keep each point short.`;
+- "stays": where to stay. ${isStay(r)
+    ? `This trip is about the stay, so give 3-4 options for ${r.trip.stops.map((s) => getCity(s.city).name).join(" and ")} in different styles (for nature areas: a cabin or vacation rental in a nearby town or by a lake, a lodge, a campground or yurt; in towns: a rental and a hotel area), each a real, specific base near the place (e.g. Shaver Lake or Bass Lake for Sierra National Forest). Use the stop's CITY_CODE for "city".`
+    : `For each stop without a chosen hotel, the best area to base yourself (1 per city, at most 6 in all).`} Prices are rough guides, not quotes.
+- ${domestic(r)
+    ? `"beforeYouGo" covers, for these places and dates: Getting there & roads (seasonal road closures, chain controls, fuel and the last town with services), Permits & passes (park entry, wilderness or campfire permits, fire restrictions), Weather & packing (altitude and night temperatures), Phone & signal, Safety (wildlife and food storage, water, altitude), Leave no trace. Mark Getting there or Permits important=true when they could stop the trip. Do not state fees or dates you are unsure of; say to check the managing agency's site.`
+    : `"beforeYouGo" covers, for US passport holders and these exact countries and dates: Visa & entry (important=true; describe the options clearly, say rules change, and tell them to confirm with official sources), Money & payments, Phone & internet, Getting around, Health & safety, Etiquette, Weather & packing. Be specific to the destinations (e.g. in mainland China many Western apps are blocked and mobile payments dominate). Do not state fees or durations you are unsure of. Keep each point short.`}`;
 
   const slots = daySlots(r);
   const countries = [...new Set(r.trip.stops.map((s) => getCity(s.city).countryName))].join(", ");

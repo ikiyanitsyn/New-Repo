@@ -1,4 +1,4 @@
-import { findCity } from "@/lib/cities";
+import { findCity, registerPlaces } from "@/lib/cities";
 import { makePlan, type PlanOptions } from "@/lib/ai/plan";
 import { AiError } from "@/lib/ai/provider";
 import { PlanRequest } from "@/lib/ai/schema";
@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "The trip details were incomplete. Reload the page and try again." }, { status: 400 });
   }
   const r = parsed.data;
+  registerPlaces(r.trip.places);
   if (!findCity(r.trip.home) || r.trip.stops.some((s) => !findCity(s.city))) {
     return Response.json({ error: "The trip includes a city the planner doesn't know." }, { status: 400 });
   }

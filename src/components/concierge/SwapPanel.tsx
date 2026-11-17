@@ -1,5 +1,6 @@
 "use client";
 
+import { customPlaceOf } from "@/lib/cities";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlanDay, PlanItem, SwapOption, SwapRequest, SwapResult } from "@/lib/ai/schema";
 import { RatingBadge } from "./RatingBadge";
@@ -42,8 +43,10 @@ export function SwapPanel({ day, item, context, onPick, onClose }: Props) {
     setState({ phase: "loading" });
     const ctx = contextRef.current;
     const day = dayRef.current;
+    const place = customPlaceOf(day.city);
     const body: SwapRequest = {
       city: day.city,
+      ...(place ? { place } : {}),
       date: day.date,
       request: ctx.request,
       preferences: ctx.preferences,

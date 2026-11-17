@@ -19,7 +19,7 @@ export function BudgetFooter({ trip }: { trip: Trip }) {
       <button type="button" className="flex w-full items-end justify-between gap-3 text-left" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)}>
         <span className="min-w-0">
           <span className="eyebrow !text-[10px]">{isBudgetComplete(b) ? "Trip budget" : "Trip budget so far"}</span>
-          <span className="mt-0.5 block text-[12px] text-ink-2">{perPersonText(b, trip.adults)}</span>
+          <span className="mt-0.5 block text-[12px] text-ink-2">{perPersonText(b, trip.adults, trip.tripType === "stay" ? "guest" : "traveller")}</span>
         </span>
         <span className="flex items-center gap-2">
           <span className="data text-[22px] leading-tight">{formatUsd(b.total)}</span>

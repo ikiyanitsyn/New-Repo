@@ -2,7 +2,7 @@ import "server-only";
 import { findCity } from "../cities";
 import { commonsThumb } from "./links";
 import { pageBanner } from "./parse";
-import { articleTitle, articleUrl, raw } from "./wikivoyage";
+import { articleTitle, articleUrl, nearbyArticles, raw } from "./wikivoyage";
 
 /**
  * Just a city's wide banner photo (the travel guide's page banner on Wikimedia
@@ -29,7 +29,14 @@ export async function cityBanner(code: string, width = 1920): Promise<CityBanner
   const empty: CityBanner = { city: code, url: null, hero: null, file: null, credit: "", creditUrl: "" };
   if (!city) return empty;
   try {
-    const page = await raw(articleTitle(code));
+    // A searched place may have no guide article of its own: use the nearest one's banner,
+    // and the place's own Wikipedia photo as the hero.
+    const page = city.custom
+      ? await raw(city.name).catch(async () => {
+          const [near] = await nearbyArticles(city, 40, 1);
+          return near ? raw(near) : { title: city.name, text: "" };
+        })
+      : await raw(articleTitle(code));
     const file = pageBanner(page.text) ?? null;
     const value: CityBanner = {
       city: code,

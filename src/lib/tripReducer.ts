@@ -2,6 +2,7 @@ import type { Mode } from "./ground";
 import type { Cabin } from "./flights/types";
 import { newId, sampleTrip, type ChosenHotel, type FlightPick, type SavedPlace, type Trip, type TripCost, type TripType } from "./trip";
 import type { SavedPlan } from "./ai/schema";
+import { registerPlaces, type CustomPlace } from "./cities";
 
 export type TripAction =
   | { type: "load"; trip: Trip }
@@ -29,7 +30,9 @@ export type TripAction =
   | { type: "dayNote"; date: string; text: string }
   | { type: "addCost"; cost: Omit<TripCost, "id"> & { id?: string } }
   | { type: "removeCost"; id: string }
-  | { type: "planResponse"; response: import("./ai/schema").PlanResponse };
+  | { type: "planResponse"; response: import("./ai/schema").PlanResponse }
+  /** Remember places found by search (anywhere, not just catalog cities) so stops can use them. */
+  | { type: "addPlaces"; places: CustomPlace[] };
 
 export function tripReducer(t: Trip, a: TripAction): Trip {
   switch (a.type) {
@@ -87,7 +90,7 @@ export function tripReducer(t: Trip, a: TripAction): Trip {
         picks: {},
       };
     case "tripType":
-      return { ...t, tripType: a.value, returnHome: a.value !== "oneway" };
+      return { ...t, tripType: a.value, returnHome: a.value !== "oneway" && a.value !== "stay" };
     case "stopover":
       return { ...t, stops: t.stops.map((s) => (s.id === a.id ? { ...s, stopover: a.value || undefined } : s)) };
     case "travellers":
@@ -117,6 +120,12 @@ export function tripReducer(t: Trip, a: TripAction): Trip {
     }
     case "removeCost":
       return { ...t, costs: (t.costs ?? []).filter((c) => c.id !== a.id) };
+    case "addPlaces": {
+      registerPlaces(a.places);
+      const byCode = new Map((t.places ?? []).map((p) => [p.code, p]));
+      for (const p of a.places) byCode.set(p.code, p);
+      return { ...t, places: [...byCode.values()] };
+    }
     case "planResponse":
       return t.plan ? { ...t, plan: { ...t.plan, response: a.response } } : t;
   }

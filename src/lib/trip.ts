@@ -1,4 +1,4 @@
-import { findCity, getCity, type City } from "./cities";
+import { findCity, getCity, registerPlaces, type City, type CustomPlace } from "./cities";
 import { defaultMode, type Mode } from "./ground";
 import { distanceKm } from "./geo";
 import type { Cabin } from "./flights/types";
@@ -11,7 +11,8 @@ export interface Stop {
   stopover?: boolean;
 }
 
-export type TripType = "oneway" | "round" | "multi" | "stopover";
+/** "stay": no flights at all, just somewhere to stay (a cabin in a national forest, a weekend in town). */
+export type TripType = "oneway" | "round" | "multi" | "stopover" | "stay";
 
 /** The hotel the traveller picked for a city, with the price found when they picked it. */
 export interface ChosenHotel {
@@ -65,7 +66,12 @@ export interface Trip {
   dayNotes?: Record<string, string>;
   /** Activities and other costs. */
   costs?: TripCost[];
+  /** Places found by search that aren't in the city catalog (their codes start with "0"). */
+  places?: CustomPlace[];
 }
+
+/** A trip with no flights: the traveller gets there on their own and only needs stays and plans. */
+export const isStayTrip = (t: Pick<Trip, "tripType">) => t.tripType === "stay";
 
 export interface SavedPlace {
   key: string; // lower-cased name; stable across guide refreshes
@@ -122,9 +128,11 @@ function arrivalDayOffset(home: City, first: City): number {
 }
 
 export function stopsWithDates(trip: Trip): StopWithDates[] {
+  registerPlaces(trip.places);
   if (trip.stops.length === 0) return [];
   const home = getCity(trip.home);
-  let cursor = addDays(trip.departDate, arrivalDayOffset(home, getCity(trip.stops[0].city)));
+  // A stay starts on the check-in day; a flight to another continent lands a day later.
+  let cursor = isStayTrip(trip) ? trip.departDate : addDays(trip.departDate, arrivalDayOffset(home, getCity(trip.stops[0].city)));
   return trip.stops.map((s) => {
     const arrive = cursor;
     const depart = addDays(arrive, s.nights);
@@ -141,13 +149,16 @@ export function tripLegs(trip: Trip): Leg[] {
   if (stops.length === 0) return [];
   const legs: Leg[] = [];
   const first = stops[0];
-  legs.push({ id: "outbound", kind: "outbound", from: home, to: first.cityInfo, date: trip.departDate, mode: "flight", distanceKm: distanceKm(home, first.cityInfo) });
+  const stay = isStayTrip(trip);
+  if (!stay) legs.push({ id: "outbound", kind: "outbound", from: home, to: first.cityInfo, date: trip.departDate, mode: "flight", distanceKm: distanceKm(home, first.cityInfo) });
   for (let i = 0; i < stops.length - 1; i++) {
     const a = stops[i], b = stops[i + 1];
-    const mode = trip.legModes[legKey(a, b)] ?? defaultMode(a.cityInfo, b.cityInfo);
+    // Between searched places (no airports) or on a stay, the default is to drive.
+    const auto = defaultMode(a.cityInfo, b.cityInfo);
+    const mode = trip.legModes[legKey(a, b)] ?? (a.cityInfo.custom || b.cityInfo.custom || (stay && auto === "flight") ? "car" : auto);
     legs.push({ id: legKey(a, b), kind: "between", from: a.cityInfo, to: b.cityInfo, date: a.depart, mode, distanceKm: distanceKm(a.cityInfo, b.cityInfo) });
   }
-  if (trip.returnHome) {
+  if (trip.returnHome && !stay) {
     const last = stops[stops.length - 1];
     legs.push({ id: "return", kind: "return", from: last.cityInfo, to: home, date: last.depart, mode: "flight", distanceKm: distanceKm(last.cityInfo, home) });
   }
@@ -186,6 +197,7 @@ export function sampleTrip(): Trip {
 
 export function isTrip(v: unknown): v is Trip {
   const t = v as Trip;
+  if (t && Array.isArray(t.places)) registerPlaces(t.places);
   return (
     !!t && t.version === 1 && !!findCity(t.home) && Array.isArray(t.stops) &&
     t.stops.every((s) => !!findCity(s.city) && typeof s.nights === "number" && typeof s.id === "string")

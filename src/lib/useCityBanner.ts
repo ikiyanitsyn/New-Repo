@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { placeParam } from "./places/customParam";
 
 export interface BannerInfo { url: string | null; hero: string | null; credit: string; creditUrl: string }
 
@@ -13,7 +14,7 @@ export function useCityBanner(code: string | undefined | null, width = 1920): Ba
   useEffect(() => {
     if (!code || memo.has(key)) return;
     let alive = true;
-    fetch(`/api/places/banner?city=${code}&w=${width}`)
+    fetch(`/api/places/banner?${new URLSearchParams({ city: code, w: String(width), ...placeParam(code) })}`)
       .then((r) => r.json())
       .then((j) => {
         const info: BannerInfo = { url: j.url ?? null, hero: j.hero ?? null, credit: j.credit ?? "", creditUrl: j.creditUrl ?? "" };

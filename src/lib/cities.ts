@@ -32,6 +32,12 @@ export interface City {
   flightCode?: string;
   /** Wikivoyage article title, set only where it differs from `name`. */
   wikivoyageTitle?: string;
+  /** A place the traveller found by search (see CustomPlace), not one of the catalog cities. */
+  custom?: true;
+  /** State, province or county of a custom place. */
+  area?: string;
+  /** OpenStreetMap's kind of place for a custom place ("national forest", "town"…). */
+  kind?: string;
 }
 
 type Base = Omit<City, "country" | "countryName" | "region">;
@@ -237,6 +243,96 @@ export const CITIES: City[] = [
 ];
 
 const BY_CODE = new Map(CITIES.map((c) => [c.code, c]));
+
+/* ------------------------------------------------------------------ */
+/* Places anywhere: a national forest, a lake town, a ski village…    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A place the traveller found by searching OpenStreetMap, outside the catalog above.
+ * It is saved inside the trip (`trip.places`) and registered at runtime, so every
+ * `getCity` lookup works for it. There are no airports: these places are for stays,
+ * and for drives between stops.
+ */
+export interface CustomPlace {
+  /** "0" plus five letters or digits, e.g. "0K3F9Z". Never clashes with a catalog code. */
+  code: string;
+  name: string;
+  lat: number;
+  lon: number;
+  /** ISO 3166-1 alpha-2, upper case. */
+  country: string;
+  countryName: string;
+  /** State, province or county, for display and searches ("California"). */
+  area?: string;
+  /** What OpenStreetMap calls it: "national forest", "town", "lake"… */
+  kind?: string;
+}
+
+export const CUSTOM_CODE = /^0[0-9A-Z]{5}$/;
+export const isCustomCode = (code: string) => CUSTOM_CODE.test(code);
+
+/** A rough region from the coordinates (it only steers grouping and travel-day guesses). */
+function regionAt(lat: number, lon: number): Region {
+  if (lon < -25) return "North America";
+  if (lon < 60) return lat < 38 && lon > 34 ? "Middle East" : "Europe";
+  return lat < 24 ? "Southeast Asia" : "East Asia";
+}
+
+/** A time zone good enough for display: US zones by longitude, else a whole-hour offset. */
+function zoneAt(lat: number, lon: number, country: string): string {
+  if (country === "US") {
+    if (lat < 23 && lon < -150) return "Pacific/Honolulu";
+    return lon < -114.5 ? "America/Los_Angeles" : lon < -101 ? "America/Denver" : lon < -86.5 ? "America/Chicago" : "America/New_York";
+  }
+  const h = Math.round(lon / 15);
+  return h === 0 ? "Etc/GMT" : `Etc/GMT${h > 0 ? "-" : "+"}${Math.abs(h)}`;
+}
+
+export function placeCity(p: CustomPlace): City {
+  return {
+    code: p.code,
+    name: p.name,
+    country: p.country,
+    countryName: p.countryName,
+    region: regionAt(p.lat, p.lon),
+    airports: [],
+    lat: p.lat,
+    lon: p.lon,
+    timeZone: zoneAt(p.lat, p.lon, p.country),
+    custom: true,
+    area: p.area,
+    kind: p.kind,
+  };
+}
+
+/** Make a trip's own places known to `getCity`. Safe to call often; the latest details win. */
+export function registerPlaces(places: readonly CustomPlace[] | undefined): void {
+  for (const p of places ?? []) {
+    if (isCustomCode(p.code) && Number.isFinite(p.lat) && Number.isFinite(p.lon)) BY_CODE.set(p.code, placeCity(p));
+  }
+}
+
+/** A stable code for a place: the same name and spot always gets the same code. */
+export function customPlaceCode(name: string, lat: number, lon: number): string {
+  const key = `${name.trim().toLowerCase()}|${lat.toFixed(3)}|${lon.toFixed(3)}`;
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619) >>> 0;
+  return "0" + (h % 60466176).toString(36).toUpperCase().padStart(5, "0");
+}
+
+/** The place behind a code, as saved in a trip, or undefined for catalog cities. */
+export function customPlaceOf(code: string): CustomPlace | undefined {
+  const c = BY_CODE.get(code);
+  if (!c?.custom) return undefined;
+  return { code: c.code, name: c.name, lat: c.lat, lon: c.lon, country: c.country, countryName: c.countryName, area: c.area, kind: c.kind };
+}
+
+/** "Sierra National Forest, California" for a place; the name alone for catalog cities. */
+export function placeLabel(c: City): string {
+  const area = c.area;
+  return area && area !== c.name ? `${c.name}, ${area}` : c.name;
+}
 
 export function getCity(code: string): City {
   const c = BY_CODE.get(code);

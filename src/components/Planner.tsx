@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { getCity } from "@/lib/cities";
-import { isTrip, sampleTrip, stopsWithDates, tripLegs, type Trip } from "@/lib/trip";
+import { isStayTrip, isTrip, sampleTrip, stopsWithDates, tripLegs, type Trip } from "@/lib/trip";
 import { tripReducer } from "@/lib/tripReducer";
 import type { Comfort } from "@/lib/places/types";
 import { PrintButton } from "./print/PrintButton";
@@ -22,6 +22,7 @@ import { Concierge } from "./Concierge";
 import { PlusIcon, SparkIcon } from "./icons";
 import { Landing } from "./Landing";
 import { LegPanel } from "./LegPanel";
+import { StayPanel } from "./planner/StayPanel";
 import { nextLegNeedingFlight } from "@/lib/flights/nextLeg";
 import { usePersistedFlag } from "./planner/usePersistedFlag";
 import { ThemeToggle } from "./ThemeToggle";
@@ -111,7 +112,8 @@ export function Planner() {
 
   const legs = useMemo(() => tripLegs(trip), [trip]);
   // If the selected leg disappears (stop removed or reordered), fall back to the first leg.
-  const activeLegId = legs.some((l) => l.id === selectedLegId) ? selectedLegId : (legs[0]?.id ?? null);
+  // A stay shows "Your stay" until a drive between places is chosen; flight trips fall back to the first leg.
+  const activeLegId = legs.some((l) => l.id === selectedLegId) ? selectedLegId : isStayTrip(trip) ? null : (legs[0]?.id ?? null);
   const selectedLeg = legs.find((l) => l.id === activeLegId);
   // After a fare is chosen: open the next leg that still needs a flight (outbound, between cities, return).
   const goToNextFlightLeg = (fromLegId: string) => {
@@ -268,6 +270,17 @@ export function Planner() {
         </div>
         <div className="stage-panels">
           <TripBuilder trip={trip} dispatch={dispatch} legs={legs} selectedLegId={activeLegId} onSelectLeg={selectLeg} onExplore={openExplorer} onConcierge={openConcierge} allFares={allFares} />
+          {isStayTrip(trip) && !selectedLeg ? (
+            <StayPanel
+              trip={trip}
+              stops={datedStops}
+              onExplore={openExplorer}
+              onConcierge={openConcierge}
+              collapsed={faresCollapsed}
+              onCollapse={() => setFaresCollapsed(true)}
+              onExpand={() => setFaresCollapsed(false)}
+            />
+          ) : (
           <LegPanel
             leg={selectedLeg}
             trip={trip}
@@ -282,6 +295,7 @@ export function Planner() {
             onCollapse={() => setFaresCollapsed(true)}
             onExpand={() => setFaresCollapsed(false)}
           />
+          )}
         </div>
         {exploreStopId && (
           <CityExplorer

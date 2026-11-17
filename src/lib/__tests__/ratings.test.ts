@@ -210,14 +210,14 @@ describe("findPlaceByName", () => {
 
 describe("hotel search links", () => {
   const ids = (code: string) => staySearchLinks(getCity(code), "2026-12-01", "2026-12-04", 2).map((l) => l.label);
-  it("always leads with Booking.com, adds Trip.com in mainland China and Hong Kong, keeps Google Hotels", () => {
-    expect(ids("BJS")).toEqual(["Booking.com", "Trip.com", "Google Hotels"]);
-    expect(ids("HKG")).toEqual(["Booking.com", "Trip.com", "Google Hotels"]);
-    expect(ids("NYC")).toEqual(["Booking.com", "Google Hotels"]);
+  it("always leads with Booking.com, adds Trip.com in mainland China and Hong Kong, rentals, then Google Hotels", () => {
+    expect(ids("BJS")).toEqual(["Booking.com", "Trip.com", "Airbnb", "Vrbo", "Google Hotels"]);
+    expect(ids("HKG")).toEqual(["Booking.com", "Trip.com", "Airbnb", "Vrbo", "Google Hotels"]);
+    expect(ids("NYC")).toEqual(["Booking.com", "Airbnb", "Vrbo", "Google Hotels"]);
   });
   it("adds Trip.com for Macau too", () => {
     const macau = { ...getCity("HKG"), code: "MFM", name: "Macau", country: "MO", countryName: "Macau SAR" };
-    expect(staySearchLinks(macau, "2026-12-01", "2026-12-04", 2).map((l) => l.label)).toEqual(["Booking.com", "Trip.com", "Google Hotels"]);
+    expect(staySearchLinks(macau, "2026-12-01", "2026-12-04", 2).map((l) => l.label)).toEqual(["Booking.com", "Trip.com", "Airbnb", "Vrbo", "Google Hotels"]);
   });
   it("pre-fills dates and guests", () => {
     const [booking, trip] = staySearchLinks(getCity("BJS"), "2026-12-01", "2026-12-04", 2);

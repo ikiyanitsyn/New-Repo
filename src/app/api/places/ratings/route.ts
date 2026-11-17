@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { findCity } from "@/lib/cities";
+import { registerFromParams } from "@/lib/places/customParam";
 import { MAX_IDS_PER_REQUEST, placeRatings, ratingsProvider } from "@/lib/places/ratings";
 
 /**
@@ -9,6 +10,7 @@ import { MAX_IDS_PER_REQUEST, placeRatings, ratingsProvider } from "@/lib/places
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
+  registerFromParams(params);
   const code = params.get("city") ?? "";
   if (!findCity(code)) return Response.json({ error: "Unknown city" }, { status: 400 });
   const ids = (params.get("ids") ?? "")

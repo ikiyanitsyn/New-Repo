@@ -148,6 +148,7 @@
 }
 .composer[data-type="stopover"] .fields { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1fr) auto; }
 .composer[data-type="multi"] .fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr) auto; }
+.composer[data-type="stay"] .fields { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 0.8fr) auto; }
 
 .part {
   position: relative;
@@ -289,6 +290,7 @@
 @media (max-width: 1100px) {
   .fields,
   .composer[data-type="stopover"] .fields,
+  .composer[data-type="stay"] .fields,
   .composer[data-type="multi"] .fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .part + .part::before { display: none; }
   .part { border-bottom: 1px solid var(--line); border-radius: 0; }
@@ -307,10 +309,14 @@
   .landing:has([role="dialog"]) { z-index: 30; }
   .title { font-size: 44px; }
   .composer { margin-top: 24px; padding: 4px 4px 6px; }
-  .types { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 6px 4px 8px; }
+  .types { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; padding: 6px 4px 8px; }
+  /* Five trip types on a phone: three on the first row, two wider ones on the second. */
+  .type { grid-column: span 2; }
+  .type:nth-child(n + 4) { grid-column: span 3; }
   .type { height: 40px; padding-inline: 8px; }
   .fields,
   .composer[data-type="stopover"] .fields,
+  .composer[data-type="stay"] .fields,
   .composer[data-type="multi"] .fields { grid-template-columns: minmax(0, 1fr); }
   .part { padding: 10px 12px; min-height: 60px; }
   .multiWrap { padding: 10px 12px 4px; }

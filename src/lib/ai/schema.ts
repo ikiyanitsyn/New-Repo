@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CustomPlaceSchema } from "../places/customParam";
 
 /**
  * What the concierge sends back. Every AI reply is checked against this before use.
@@ -80,11 +81,13 @@ const isoDate = z
   .trim()
   .regex(/^\d{4}-\d{2}-\d{2}$/);
 
+/** A catalog city code ("BJS") or a searched place's code ("0K3F9Z"). */
+const CODE = /^([A-Z]{3}|0[0-9A-Z]{5})$/;
 const cityCode = z
   .string()
   .trim()
   .transform((s) => s.toUpperCase())
-  .pipe(z.string().length(3));
+  .pipe(z.string().regex(CODE));
 
 export const PlanItem = z.object({
   time: text(20).catch(""), // "Morning", "Afternoon", "Evening" or "09:30"
@@ -132,6 +135,15 @@ export const RouteSuggestion = z.object({
   stops: lenientArray(z.object({ city: cityCode, nights }), 8).pipe(z.array(z.object({ city: z.string(), nights: z.number() })).min(1)),
 });
 
+/** A place to base yourself: "Shaver Lake · cabin rental · $180–300 a night". */
+export const StayIdea = z.object({
+  city: cityCode,
+  area: filled(60),
+  kind: text(40).catch(""),
+  why: text(300).catch(""),
+  price: optText(60),
+});
+
 export const PlanResponse = z.object({
   title: text(80).catch(""),
   summary: text(600).catch(""),
@@ -139,15 +151,19 @@ export const PlanResponse = z.object({
   routeSuggestion: RouteSuggestion.nullish().catch(null),
   days: lenientArray(PlanDay, 30),
   beforeYouGo: lenientArray(BeforeYouGo, 10),
+  /** Where to stay (absent from plans written before this was added). */
+  stays: lenientArray(StayIdea, 8),
 });
 
 /** A day-plan chunk reply: just the days for a few consecutive slots. */
 export const DaysReply = z.object({ days: lenientArray(PlanDay, 30) });
 
-export type PlanResponse = z.infer<typeof PlanResponse>;
+/** `stays` is optional: plans saved before it existed don't have it. */
+export type PlanResponse = Omit<z.infer<typeof PlanResponse>, "stays"> & { stays?: z.infer<typeof StayIdea>[] };
 export type PlanDay = z.infer<typeof PlanDay>;
 export type PlanItem = z.infer<typeof PlanItem>;
 export type Question = z.infer<typeof Question>;
+export type StayIdea = z.infer<typeof StayIdea>;
 
 /** What the browser sends. */
 export const PlanRequest = z.object({
@@ -160,12 +176,14 @@ export const PlanRequest = z.object({
     adults: z.number().int().min(1).max(9),
     cabin: z.string().max(20),
     returnHome: z.boolean(),
-    stops: z.array(z.object({ city: z.string().length(3), nights: z.number().int().min(1).max(30), stopover: z.boolean().optional() })).max(10),
-    tripType: z.enum(["oneway", "round", "multi", "stopover"]).optional(),
+    stops: z.array(z.object({ city: z.string().regex(CODE), nights: z.number().int().min(1).max(30), stopover: z.boolean().optional() })).max(10),
+    tripType: z.enum(["oneway", "round", "multi", "stopover", "stay"]).optional(),
     modes: z.array(z.string().max(10)).max(10),
     saved: z.record(z.string(), z.array(z.string().max(120)).max(40)).default({}),
     /** The hotel the traveller chose in each city (city code → hotel name). */
-    hotels: z.record(z.string().length(3), z.string().max(160)).default({}),
+    hotels: z.record(z.string().regex(CODE), z.string().max(160)).default({}),
+    /** Places found by search (not in the city list) that the stops use. */
+    places: z.array(CustomPlaceSchema).max(20).default([]),
   }),
 });
 export type PlanRequest = z.infer<typeof PlanRequest>;
@@ -192,7 +210,9 @@ export interface SavedPlan {
 
 /** What the browser sends to swap one item for an alternative. */
 export const SwapRequest = z.object({
-  city: z.string().length(3),
+  city: z.string().regex(CODE),
+  /** The searched place, when `city` isn't a catalog city. */
+  place: CustomPlaceSchema.optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   request: z.string().max(2000).default(""),
   preferences: z.array(z.string().max(40)).max(20).default([]),

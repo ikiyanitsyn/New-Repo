@@ -35,6 +35,6 @@ export function budgetLines(b: Budget): BudgetLine[] {
 }
 
 /** "$1,200 per person" for groups; "1 traveller" when solo (the total is the per-person figure). */
-export function perPersonText(b: Budget, adults: number): string {
-  return adults > 1 ? `${formatUsd(b.perPerson)} per person \u00b7 ${adults} travellers` : "1 traveller";
+export function perPersonText(b: Budget, adults: number, who: "traveller" | "guest" = "traveller"): string {
+  return adults > 1 ? `${formatUsd(b.perPerson)} per person \u00b7 ${adults} ${who}s` : `1 ${who}`;
 }
