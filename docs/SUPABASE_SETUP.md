@@ -56,7 +56,8 @@ Everything here is on the **free plan**. No card is needed.
 ## Staying free
 
 - The free plan includes a small database, plenty for thousands of trips, and generous monthly sign-ins.
-- **Free projects pause after about a week with no activity.** If the app says it can't reach your trips, open the Supabase dashboard and press **Restore project**. Your data is kept.
+- **Free projects pause after about a week with no activity.** The site prevents this itself: Vercel opens `/api/keepalive` once a day (set in `vercel.json`), which makes one tiny database read. For extra safety, add a `CRON_SECRET` in Vercel (**Settings → Environment Variables**, any long random text) so only Vercel's scheduler can call it. You can check it ran under **Settings → Cron Jobs** in Vercel.
+- If it ever pauses anyway (the app says it can't reach your trips), open the Supabase dashboard and press **Restore project**. Your data is kept.
 - Don't upgrade, and don't add a card unless you decide to later.
 - Pricing: <https://supabase.com/pricing>
 
